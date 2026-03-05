@@ -1,0 +1,26 @@
+{
+  "name": "levitate2",
+  "version": "1.0.0",
+  "description": "lift with brain damage",
+  "license": "MIT",
+  "author": "Robert Morelli",
+  "type": "module",
+  "main": "index.js",
+  "directories": {
+    "example": "examples"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "sqstart": "npm run embed:tokens && node mvp.mjs embed",
+    "embed:tokens": "node tools/embed_instruction_vectors.mjs",
+    "vectors:utils": "node tools/write_utils_vectors.mjs"
+  },
+  "dependencies": {
+    "hnswlib-wasm": "^0.8.2",
+    "undici-types": "^7.18.2"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.3",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,6 @@
+ld.global.f32
+ld.global.f32
+add.f32
+mul.f32
+st.global.f32
+ret
