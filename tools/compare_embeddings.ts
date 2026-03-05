@@ -1,11 +1,13 @@
 #!/usr/bin/env tsx
 /**
- * Runs the full conv×alg roundtrip matrix for every vector set found in utils/,
- * then writes README.md. Never calls any embedding API.
+ * Runs the full conv×alg roundtrip matrix across every PTX file in examples/
+ * and every vector set in utils/, then writes:
+ *   FULL_RESULTS.md  — per-kernel breakdown for every provider × mode
+ *   README.md        — averaged summary across all kernels
  *
- * Usage: tsx tools/compare_embeddings.ts <input.ptx>
+ * Never calls any embedding API. Run `npm run refresh` first if needed.
  *
- * To get fresh vectors first: npm run refresh
+ * Usage: tsx tools/compare_embeddings.ts
  */
 
 import { writeFileSync, readFileSync, mkdtempSync, readdirSync } from "node:fs";
@@ -50,22 +52,29 @@ function jaccard(a: string[], b: string[]): number {
 }
 
 function find_vector_sets(): VectorSet[] {
-  const files = readdirSync("utils").filter(f => f.startsWith("ptx_vectors_") && f.endsWith(".json"));
-  const sets: VectorSet[] = [];
-  for (const f of files.sort()) {
-    // ptx_vectors_{provider}_{mode}.json
-    const slug = f.replace("ptx_vectors_", "").replace(".json", "");
-    const last_underscore = slug.lastIndexOf("_");
-    const provider = slug.slice(0, last_underscore);
-    const mode     = slug.slice(last_underscore + 1);
-    const ptx_path  = `utils/ptx_vectors_${slug}.json`;
-    const llvm_path = `utils/llvm_vectors_${slug}.json`;
-    sets.push({ provider, mode, ptx_path, llvm_path });
-  }
-  return sets;
+  return readdirSync("utils")
+    .filter(f => f.startsWith("ptx_vectors_") && f.endsWith(".json"))
+    .sort()
+    .map(f => {
+      const slug = f.replace("ptx_vectors_", "").replace(".json", "");
+      const last = slug.lastIndexOf("_");
+      return {
+        provider: slug.slice(0, last),
+        mode:     slug.slice(last + 1),
+        ptx_path:  `utils/ptx_vectors_${slug}.json`,
+        llvm_path: `utils/llvm_vectors_${slug}.json`,
+      };
+    });
 }
 
-function run_matrix(vs: VectorSet, source: string, tmp: string, alg_names: string[], conv_names: string[]): Scores {
+function find_ptx_files(): string[] {
+  return readdirSync("examples")
+    .filter(f => f.endsWith(".ptx"))
+    .sort()
+    .map(f => `examples/${f}`);
+}
+
+function run_matrix(vs: VectorSet, source: string, tmp: string, slug: string, alg_names: string[], conv_names: string[]): Scores {
   process.env["PTX_VECTORS"]  = vs.ptx_path;
   process.env["LLVM_VECTORS"] = vs.llvm_path;
 
@@ -81,9 +90,9 @@ function run_matrix(vs: VectorSet, source: string, tmp: string, alg_names: strin
       if (tokens.length === 0) { scores[conv]![alg] = 0; continue; }
 
       const ll      = tokens_to_ll(tokens);
-      const slug    = `${vs.provider}_${vs.mode}_${conv}_${alg}`;
-      const ll_file = join(tmp, `${slug}.ll`);
-      const ptx_out = join(tmp, `${slug}.ptx`);
+      const id      = `${slug}_${conv}_${alg}`.replace(/[^a-z0-9_]/gi, "_");
+      const ll_file = join(tmp, `${id}.ll`);
+      const ptx_out = join(tmp, `${id}.ptx`);
       writeFileSync(ll_file, ll);
 
       const r = spawnSync("node", [resolve("llc.mjs"), ll_file, ptx_out], { encoding: "utf8" });
@@ -95,34 +104,13 @@ function run_matrix(vs: VectorSet, source: string, tmp: string, alg_names: strin
     }
   }
 
-  print_matrix(`${vs.provider}/${vs.mode}`, scores, alg_names, conv_names, best, best_cell);
+  console.log(`    best: ${best_cell}  (${(best * 100).toFixed(0)}%)`);
   return scores;
 }
 
-function print_matrix(label: string, scores: Scores, alg_names: string[], conv_names: string[], best_score: number, best_cell: string) {
-  const COL = 14, ROW = 16;
-  console.log(`\n${"═".repeat(ROW + alg_names.length * COL)}`);
-  console.log(`  ${label}`);
-  console.log(`${"═".repeat(ROW + alg_names.length * COL)}`);
-  process.stdout.write(" ".repeat(ROW));
-  for (const alg of alg_names) process.stdout.write(alg.substring(0, COL - 1).padEnd(COL));
-  console.log();
-  console.log("─".repeat(ROW + alg_names.length * COL));
-  for (const conv of conv_names) {
-    process.stdout.write(conv.padEnd(ROW));
-    for (const alg of alg_names) {
-      const s = scores[conv]?.[alg] ?? 0;
-      const pct = `${(s * 100).toFixed(0)}%`;
-      const cell = s === best_score ? `[${pct}]` : ` ${pct} `;
-      process.stdout.write(cell.padEnd(COL));
-    }
-    console.log();
-  }
-  console.log("─".repeat(ROW + alg_names.length * COL));
-  console.log(`best: ${best_cell}  (${(best_score * 100).toFixed(0)}% jaccard)\n`);
-}
+// ── Markdown helpers ──────────────────────────────────────────────────────────
 
-function best_of(scores: Scores, alg_names: string[], conv_names: string[]): { conv: string; alg: string; score: number } {
+function best_of(scores: Scores, alg_names: string[], conv_names: string[]) {
   let best = { conv: "", alg: "", score: -1 };
   for (const conv of conv_names)
     for (const alg of alg_names) {
@@ -135,10 +123,7 @@ function best_of(scores: Scores, alg_names: string[], conv_names: string[]): { c
 function scores_table_md(scores: Scores, alg_names: string[], conv_names: string[]): string[] {
   const top = best_of(scores, alg_names, conv_names).score;
   const header = ["conv \\ alg", ...alg_names];
-  const lines = [
-    `| ${header.join(" | ")} |`,
-    `| ${header.map(() => "---").join(" | ")} |`,
-  ];
+  const lines = [`| ${header.join(" | ")} |`, `| ${header.map(() => "---").join(" | ")} |`];
   for (const conv of conv_names) {
     const cells = alg_names.map(alg => {
       const s = scores[conv]?.[alg] ?? 0;
@@ -152,10 +137,7 @@ function scores_table_md(scores: Scores, alg_names: string[], conv_names: string
 
 function delta_table_md(bare: Scores, desc: Scores, alg_names: string[], conv_names: string[]): string[] {
   const header = ["conv \\ alg", ...alg_names];
-  const lines = [
-    `| ${header.join(" | ")} |`,
-    `| ${header.map(() => "---").join(" | ")} |`,
-  ];
+  const lines = [`| ${header.join(" | ")} |`, `| ${header.map(() => "---").join(" | ")} |`];
   for (const conv of conv_names) {
     const cells = alg_names.map(alg => {
       const delta = Math.round(((desc[conv]?.[alg] ?? 0) - (bare[conv]?.[alg] ?? 0)) * 100);
@@ -166,70 +148,144 @@ function delta_table_md(bare: Scores, desc: Scores, alg_names: string[], conv_na
   return lines;
 }
 
-function write_results_md(
-  ptx_file: string,
-  src_ops: string[],
-  all_scores: Map<string, { bare?: Scores; described?: Scores }>,
+// average scores across a list of score matrices
+function avg_scores(all: Scores[], alg_names: string[], conv_names: string[]): Scores {
+  const out: Scores = {};
+  for (const conv of conv_names) {
+    out[conv] = {};
+    for (const alg of alg_names) {
+      const vals = all.map(s => s[conv]?.[alg] ?? 0);
+      out[conv]![alg] = vals.reduce((a, b) => a + b, 0) / vals.length;
+    }
+  }
+  return out;
+}
+
+// ── Output writers ────────────────────────────────────────────────────────────
+
+function write_full_results(
+  // kernel → provider_mode → scores
+  all_results: Map<string, Map<string, Scores>>,
   alg_names: string[],
   conv_names: string[],
+  provider_modes: string[],
+) {
+  const lines: string[] = [];
+  lines.push(`# Full results — all kernels`);
+  lines.push(``);
+  lines.push(`Per-kernel jaccard matrices for every provider × mode combination.`);
+  lines.push(``);
+
+  for (const [kernel, pm_map] of all_results) {
+    lines.push(`## ${kernel}`);
+    lines.push(``);
+
+    // group by provider
+    const providers = [...new Set(provider_modes.map(pm => pm.split("/")[0]!))];
+    for (const provider of providers) {
+      const bare = pm_map.get(`${provider}/bare`);
+      const desc = pm_map.get(`${provider}/described`);
+      if (!bare && !desc) continue;
+
+      lines.push(`### ${provider}`);
+      lines.push(``);
+
+      if (bare) {
+        const b = best_of(bare, alg_names, conv_names);
+        lines.push(`**bare** — best: \`${b.conv} × ${b.alg}\` (${(b.score * 100).toFixed(0)}%)`);
+        lines.push(``);
+        lines.push(...scores_table_md(bare, alg_names, conv_names));
+        lines.push(``);
+      }
+      if (desc) {
+        const d = best_of(desc, alg_names, conv_names);
+        lines.push(`**described** — best: \`${d.conv} × ${d.alg}\` (${(d.score * 100).toFixed(0)}%)`);
+        lines.push(``);
+        lines.push(...scores_table_md(desc, alg_names, conv_names));
+        lines.push(``);
+      }
+      if (bare && desc) {
+        lines.push(`**bare → described delta**`);
+        lines.push(``);
+        lines.push(...delta_table_md(bare, desc, alg_names, conv_names));
+        lines.push(``);
+      }
+    }
+  }
+
+  writeFileSync("FULL_RESULTS.md", lines.join("\n"));
+  console.log("\nWrote FULL_RESULTS.md");
+}
+
+function write_readme(
+  ptx_files: string[],
+  // provider_mode → list of scores (one per kernel)
+  pm_all_scores: Map<string, Scores[]>,
+  alg_names: string[],
+  conv_names: string[],
+  provider_modes: string[],
 ) {
   const lines: string[] = [];
   lines.push(`# Levitate roundtrip results`);
   lines.push(``);
-  lines.push(`**Input:** \`${ptx_file}\`  `);
-  lines.push(`**Source ops:** \`${src_ops.join(" ")}\`  `);
-  lines.push(`**Metric:** Jaccard similarity on PTX opcode sets  `);
+  lines.push(`Averaged jaccard similarity across **${ptx_files.length} kernels**: ${ptx_files.map(f => `\`${f.replace("examples/","")}\``).join(", ")}`);
+  lines.push(``);
+  lines.push(`**Metric:** Jaccard similarity on PTX opcode sets (averaged across all kernels)`);
   lines.push(``);
 
-  const providers = [...all_scores.keys()];
+  const providers = [...new Set(provider_modes.map(pm => pm.split("/")[0]!))];
 
   for (const provider of providers) {
-    const { bare, described } = all_scores.get(provider)!;
+    const bare_all = pm_all_scores.get(`${provider}/bare`) ?? [];
+    const desc_all = pm_all_scores.get(`${provider}/described`) ?? [];
+    if (bare_all.length === 0 && desc_all.length === 0) continue;
+
     lines.push(`## ${provider}`);
     lines.push(``);
 
-    if (bare) {
-      const b = best_of(bare, alg_names, conv_names);
+    if (bare_all.length > 0) {
+      const avg = avg_scores(bare_all, alg_names, conv_names);
+      const b = best_of(avg, alg_names, conv_names);
       lines.push(`### bare`);
       lines.push(``);
-      lines.push(`> **Best:** \`${b.conv} × ${b.alg}\` — **${(b.score * 100).toFixed(0)}%**`);
+      lines.push(`> **Best avg:** \`${b.conv} × ${b.alg}\` — **${(b.score * 100).toFixed(0)}%**`);
       lines.push(``);
-      lines.push(...scores_table_md(bare, alg_names, conv_names));
+      lines.push(...scores_table_md(avg, alg_names, conv_names));
       lines.push(``);
     }
 
-    if (described) {
-      const d = best_of(described, alg_names, conv_names);
+    if (desc_all.length > 0) {
+      const avg = avg_scores(desc_all, alg_names, conv_names);
+      const d = best_of(avg, alg_names, conv_names);
       lines.push(`### described`);
       lines.push(``);
-      lines.push(`> **Best:** \`${d.conv} × ${d.alg}\` — **${(d.score * 100).toFixed(0)}%**`);
+      lines.push(`> **Best avg:** \`${d.conv} × ${d.alg}\` — **${(d.score * 100).toFixed(0)}%**`);
       lines.push(``);
-      lines.push(...scores_table_md(described, alg_names, conv_names));
+      lines.push(...scores_table_md(avg, alg_names, conv_names));
       lines.push(``);
     }
 
-    if (bare && described) {
+    if (bare_all.length > 0 && desc_all.length > 0) {
+      const bare_avg = avg_scores(bare_all, alg_names, conv_names);
+      const desc_avg = avg_scores(desc_all, alg_names, conv_names);
       lines.push(`### bare → described delta`);
       lines.push(``);
-      lines.push(`Positive = described beat bare.`);
-      lines.push(``);
-      lines.push(...delta_table_md(bare, described, alg_names, conv_names));
+      lines.push(...delta_table_md(bare_avg, desc_avg, alg_names, conv_names));
       lines.push(``);
     }
   }
 
-  // cross-provider summary
+  // summary table
   lines.push(`## summary`);
   lines.push(``);
-  lines.push(`| provider | bare best | described best |`);
+  lines.push(`| provider | bare avg best | described avg best |`);
   lines.push(`| --- | --- | --- |`);
   for (const provider of providers) {
-    const { bare, described } = all_scores.get(provider)!;
-    const b = bare      ? best_of(bare,      alg_names, conv_names) : null;
-    const d = described ? best_of(described, alg_names, conv_names) : null;
-    const b_str = b ? `${(b.score * 100).toFixed(0)}% (\`${b.conv} × ${b.alg}\`)` : "n/a";
-    const d_str = d ? `${(d.score * 100).toFixed(0)}% (\`${d.conv} × ${d.alg}\`)` : "n/a";
-    lines.push(`| ${provider} | ${b_str} | ${d_str} |`);
+    const bare_avg = pm_all_scores.get(`${provider}/bare`) ?? [];
+    const desc_avg = pm_all_scores.get(`${provider}/described`) ?? [];
+    const b = bare_avg.length > 0 ? best_of(avg_scores(bare_avg, alg_names, conv_names), alg_names, conv_names) : null;
+    const d = desc_avg.length > 0 ? best_of(avg_scores(desc_avg, alg_names, conv_names), alg_names, conv_names) : null;
+    lines.push(`| ${provider} | ${b ? `${(b.score*100).toFixed(0)}% (\`${b.conv} × ${b.alg}\`)` : "n/a"} | ${d ? `${(d.score*100).toFixed(0)}% (\`${d.conv} × ${d.alg}\`)` : "n/a"} |`);
   }
   lines.push(``);
 
@@ -240,33 +296,44 @@ function write_results_md(
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 (async () => {
-  const ptx_file = process.argv[2];
-  if (!ptx_file) { console.error("Usage: compare_embeddings.ts <input.ptx>"); process.exit(1); }
-
   const vector_sets = find_vector_sets();
-  if (vector_sets.length === 0) {
-    console.error("No vector files found in utils/. Run: npm run refresh");
-    process.exit(1);
-  }
+  const ptx_files   = find_ptx_files();
 
-  const source     = readFileSync(ptx_file, "utf8");
-  const src_ops    = ops_of(source);
+  if (vector_sets.length === 0) { console.error("No vector files in utils/. Run: npm run refresh"); process.exit(1); }
+
   const tmp        = mkdtempSync(join(tmpdir(), "levitate-"));
   const alg_names  = [...registry.keys()];
   const conv_names = [...conv_registry.keys()];
+  const pm_labels  = [...new Set(vector_sets.map(v => `${v.provider}/${v.mode}`))];
 
-  console.log(`\nsource: ${src_ops.join(" ")}`);
-  console.log(`\nFound ${vector_sets.length} vector sets: ${vector_sets.map(v => `${v.provider}/${v.mode}`).join(", ")}\n`);
+  console.log(`\n${ptx_files.length} kernels × ${vector_sets.length} vector sets × ${conv_names.length} convs × ${alg_names.length} algs\n`);
 
-  const all_scores = new Map<string, { bare?: Scores; described?: Scores }>();
+  // kernel → provider_mode → scores
+  const all_results   = new Map<string, Map<string, Scores>>();
+  // provider_mode → scores[]  (one per kernel)
+  const pm_all_scores = new Map<string, Scores[]>();
 
-  for (const vs of vector_sets) {
-    const scores = run_matrix(vs, source, tmp, alg_names, conv_names);
-    const entry = all_scores.get(vs.provider) ?? {};
-    if (vs.mode === "bare") entry.bare = scores;
-    else if (vs.mode === "described") entry.described = scores;
-    all_scores.set(vs.provider, entry);
+  for (const ptx_file of ptx_files) {
+    const kernel = ptx_file.replace("examples/", "").replace(".ptx", "");
+    const source = readFileSync(ptx_file, "utf8");
+    const src_ops = ops_of(source);
+    console.log(`\n── ${kernel}  [${src_ops.join(" ")}]`);
+
+    const pm_map = new Map<string, Scores>();
+
+    for (const vs of vector_sets) {
+      const pm  = `${vs.provider}/${vs.mode}`;
+      const slug = `${kernel}_${vs.provider}_${vs.mode}`;
+      process.stdout.write(`  ${pm}: `);
+      const scores = run_matrix(vs, source, tmp, slug, alg_names, conv_names);
+      pm_map.set(pm, scores);
+      if (!pm_all_scores.has(pm)) pm_all_scores.set(pm, []);
+      pm_all_scores.get(pm)!.push(scores);
+    }
+
+    all_results.set(kernel, pm_map);
   }
 
-  write_results_md(ptx_file, src_ops, all_scores, alg_names, conv_names);
+  write_full_results(all_results, alg_names, conv_names, pm_labels);
+  write_readme(ptx_files, pm_all_scores, alg_names, conv_names, pm_labels);
 })();

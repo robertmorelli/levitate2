@@ -1,0 +1,23 @@
+.version 4.1
+.target sm_52
+.address_size 64
+
+// out = a * b
+.visible .func mul_only(
+  .param .b64 p0,
+  .param .b64 p1,
+  .param .b64 p2
+)
+{
+  .reg .b32 %r<4>;
+  .reg .b64 %rd<4>;
+
+  ld.param.b64 %rd1, [p0];
+  ld.global.b32 %r1, [%rd1];
+  ld.param.b64 %rd2, [p1];
+  ld.global.b32 %r2, [%rd2];
+  ld.param.b64 %rd3, [p2];
+  mul.rn.f32 %r3, %r1, %r2;
+  st.global.b32 [%rd3], %r3;
+  ret;
+}
