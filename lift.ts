@@ -55,3 +55,6 @@ import "./algorithms/arithmetic.js";
 import "./algorithms/arithmetic_opt.js";
 import "./algorithms/momentum.js";
 import "./algorithms/dominant_prefix.js";
+import "./algorithms/delta_decode.js";
+import "./algorithms/amplitude_sort.js";
+import "./algorithms/conv_residual.js";

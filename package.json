@@ -13,6 +13,7 @@
     "roundtrip": "tsx roundtrip.ts",
     "refresh": "tsx tools/refresh_vectors.ts",
     "compare": "tsx tools/compare_embeddings.ts",
+    "bench": "tsx tools/bench.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
