@@ -1,62 +1,80 @@
 #!/usr/bin/env tsx
 /**
- * Roundtrip test: PTX → lift() → .ll → llc → PTX → diff
+ * Roundtrip harness: PTX → each lift algorithm → .ll → llc → PTX → compare
  *
- * Usage:  npx tsx roundtrip.ts <input.ptx>
- *   or:   npm run roundtrip <input.ptx>
+ * Usage:  npm run roundtrip <input.ptx>
  */
 
 import { readFileSync, writeFileSync, mkdtempSync } from "node:fs";
-import { execSync, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { lift } from "./lift.js";
+import "./algorithms/global_residual.js";
+import "./algorithms/per_token.js";
+import "./algorithms/arithmetic.js";
+import "./algorithms/momentum.js";
+import { lift_all } from "./lift.js";
 import { tokens_to_ll } from "./utils/tokens_to_ll.js";
 
 const ptxFile = process.argv[2];
-if (!ptxFile) {
-  console.error("Usage: roundtrip.ts <input.ptx>");
-  process.exit(1);
-}
+if (!ptxFile) { console.error("Usage: roundtrip.ts <input.ptx>"); process.exit(1); }
 
 const source = readFileSync(ptxFile, "utf8");
+const srcOps = ops_of(source);
 
-// ── 1. Lift PTX → LLVM token sequence ────────────────────────────────────────
-const tokens = lift(source);
-console.log("lifted tokens:", tokens.join(" "));
+const tmp = mkdtempSync(join(tmpdir(), "levitate-"));
+const results = lift_all(source);
 
-// ── 2. Assemble tokens → .ll ─────────────────────────────────────────────────
-const ll = tokens_to_ll(tokens);
+console.log(`\nsource ops: ${srcOps.join(" ")}\n`);
+console.log("─".repeat(72));
 
-// ── 3. Write temp files ───────────────────────────────────────────────────────
-const tmp    = mkdtempSync(join(tmpdir(), "levitate-"));
-const llFile = join(tmp, "lifted.ll");
-const ptxOut = join(tmp, "lifted.ptx");
+for (const [name, tokens] of Object.entries(results)) {
+  console.log(`\n▶ ${name}`);
+  console.log(`  lifted:    ${tokens.join(" ") || "(none)"}`);
 
-writeFileSync(llFile, ll);
+  if (tokens.length === 0) {
+    console.log(`  roundtrip: (skipped — no tokens)`);
+    continue;
+  }
 
-// ── 4. Compile .ll → .ptx via llc ────────────────────────────────────────────
-execSync(`node ${resolve("llc.mjs")} "${llFile}" "${ptxOut}"`, { stdio: "inherit" });
-const roundtripped = readFileSync(ptxOut, "utf8");
+  const ll = tokens_to_ll(tokens);
+  const llFile = join(tmp, `${name}.ll`);
+  const ptxOut = join(tmp, `${name}.ptx`);
+  writeFileSync(llFile, ll);
 
-// ── 5. Diff ───────────────────────────────────────────────────────────────────
-console.log("\n── diff (source vs roundtrip) ──");
-const r = spawnSync("diff", [ptxFile, ptxOut], { encoding: "utf8" });
-if (r.stdout) process.stdout.write(r.stdout);
+  const compiled = spawnSync(
+    "node",
+    [resolve("llc.mjs"), llFile, ptxOut],
+    { encoding: "utf8" }
+  );
 
-const opsOf = (ptx: string): string[] =>
-  ptx.split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter((l) => l && !l.startsWith("//") && !l.startsWith(".") && !l.startsWith("@") && l !== "{" && l !== "}")
-    .map((l) => (l.match(/^([a-z][a-z0-9_.]*)/i) ?? [])[1] ?? "")
+  if (compiled.status !== 0) {
+    console.log(`  roundtrip: (llc failed)`);
+    console.log(`  error: ${compiled.stderr?.trim()}`);
+    continue;
+  }
+
+  const rtOps = ops_of(readFileSync(ptxOut, "utf8"));
+  const score = jaccard(srcOps, rtOps);
+  console.log(`  roundtrip: ${rtOps.join(" ") || "(empty)"}`);
+  console.log(`  score:     ${(score * 100).toFixed(0)}% jaccard`);
+}
+
+console.log("\n" + "─".repeat(72));
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+
+function ops_of(ptx: string): string[] {
+  return ptx.split(/\r?\n/)
+    .map(l => l.trim())
+    .filter(l => l && !l.startsWith("//") && !l.startsWith(".") && !l.startsWith("@") && l !== "{" && l !== "}")
+    .map(l => (l.match(/^([a-z][a-z0-9_.]*)/i) ?? [])[1] ?? "")
     .filter(Boolean);
+}
 
-const srcOps = opsOf(source);
-const outOps = opsOf(roundtripped);
-console.log("\n── op diff ──");
-console.log("source:    ", srcOps.join(" "));
-console.log("roundtrip: ", outOps.join(" "));
-if (r.status === 0) console.log("\n✓ identical");
-
-console.log("\n── lifted IR ──");
-console.log(ll);
+function jaccard(a: string[], b: string[]): number {
+  const sa = new Set(a), sb = new Set(b);
+  const inter = [...sa].filter(x => sb.has(x)).length;
+  const union = new Set([...sa, ...sb]).size;
+  return union === 0 ? 1 : inter / union;
+}
