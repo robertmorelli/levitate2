@@ -13,6 +13,7 @@ import "./algorithms/global_residual.js";
 import "./algorithms/per_token.js";
 import "./algorithms/arithmetic.js";
 import "./algorithms/momentum.js";
+import "./algorithms/dominant_prefix.js";
 import { lift_all } from "./lift.js";
 import { tokens_to_ll } from "./utils/tokens_to_ll.js";
 
