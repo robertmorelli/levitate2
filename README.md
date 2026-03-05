@@ -6,9 +6,9 @@
 
 ## gemini
 
-### bare embeddings
+### bare
 
-> **Best:** `identity × arithmetic` — **100%** jaccard
+> **Best:** `identity × arithmetic` — **100%**
 
 | conv \ alg | global_residual | per_token | arithmetic | momentum | dominant_prefix | delta_decode | amplitude_sort | conv_residual |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -19,9 +19,9 @@
 | differential | 50% | 71% | **100%** | 50% | 0% | 17% | 63% | **100%** |
 | ema | 17% | 86% | **100%** | 17% | 17% | 17% | 75% | 86% |
 
-### described embeddings
+### described
 
-> **Best:** `identity × global_residual` — **100%** jaccard
+> **Best:** `identity × global_residual` — **100%**
 
 | conv \ alg | global_residual | per_token | arithmetic | momentum | dominant_prefix | delta_decode | amplitude_sort | conv_residual |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -32,7 +32,7 @@
 | differential | 71% | 57% | **100%** | 71% | 0% | **100%** | 50% | 86% |
 | ema | **100%** | 86% | **100%** | **100%** | 83% | **100%** | 75% | 86% |
 
-### bare vs described delta
+### bare → described delta
 
 Positive = described beat bare.
 
@@ -45,52 +45,11 @@ Positive = described beat bare.
 | differential | **+21%** | -14% | 0% | **+21%** | 0% | **+83%** | -12% | -14% |
 | ema | **+83%** | 0% | 0% | **+83%** | **+67%** | **+83%** | 0% | 0% |
 
-## openai
-
-### bare embeddings
-
-> **Best:** `identity × conv_residual` — **100%** jaccard
-
-| conv \ alg | global_residual | per_token | arithmetic | momentum | dominant_prefix | delta_decode | amplitude_sort | conv_residual |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| identity | 50% | 50% | 50% | 50% | 17% | 17% | 50% | **100%** |
-| gaussian | 50% | 17% | 17% | 50% | 17% | 17% | 50% | 75% |
-| causal | 50% | 17% | 17% | 50% | 17% | 17% | 50% | 17% |
-| uniform | 50% | 17% | 17% | 50% | 17% | 17% | 50% | 86% |
-| differential | 17% | 17% | 17% | 17% | 0% | 67% | 57% | 17% |
-| ema | 17% | 17% | 17% | 50% | 17% | 17% | 57% | 86% |
-
-### described embeddings
-
-> **Best:** `differential × arithmetic` — **100%** jaccard
-
-| conv \ alg | global_residual | per_token | arithmetic | momentum | dominant_prefix | delta_decode | amplitude_sort | conv_residual |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| identity | 50% | 86% | 63% | 67% | 67% | 63% | 63% | 75% |
-| gaussian | 67% | 50% | 63% | 67% | 67% | 17% | 57% | 63% |
-| causal | 50% | 63% | 75% | 57% | 17% | 63% | 75% | 63% |
-| uniform | 67% | 63% | 75% | 67% | 67% | 63% | 71% | 63% |
-| differential | 71% | 71% | **100%** | 71% | 0% | **100%** | 63% | **100%** |
-| ema | 50% | 75% | 75% | 50% | 50% | 75% | 75% | 75% |
-
-### bare vs described delta
-
-Positive = described beat bare.
-
-| conv \ alg | global_residual | per_token | arithmetic | momentum | dominant_prefix | delta_decode | amplitude_sort | conv_residual |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| identity | 0% | **+36%** | **+13%** | **+17%** | **+50%** | **+46%** | **+13%** | -25% |
-| gaussian | **+17%** | **+33%** | **+46%** | **+17%** | **+50%** | 0% | **+7%** | -12% |
-| causal | 0% | **+46%** | **+58%** | **+7%** | 0% | **+46%** | **+25%** | **+46%** |
-| uniform | **+17%** | **+46%** | **+58%** | **+17%** | **+50%** | **+46%** | **+21%** | -23% |
-| differential | **+55%** | **+55%** | **+83%** | **+55%** | 0% | **+33%** | **+5%** | **+83%** |
-| ema | **+33%** | **+58%** | **+58%** | 0% | **+33%** | **+58%** | **+18%** | -11% |
-
 ## ollama
 
-### bare embeddings
+### bare
 
-> **Best:** `identity × per_token` — **71%** jaccard
+> **Best:** `identity × per_token` — **71%**
 
 | conv \ alg | global_residual | per_token | arithmetic | momentum | dominant_prefix | delta_decode | amplitude_sort | conv_residual |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -101,9 +60,9 @@ Positive = described beat bare.
 | differential | 50% | 63% | 67% | 50% | 50% | 67% | 50% | 50% |
 | ema | 50% | 50% | 50% | 50% | 50% | 67% | 50% | 50% |
 
-### described embeddings
+### described
 
-> **Best:** `differential × arithmetic` — **100%** jaccard
+> **Best:** `differential × arithmetic` — **100%**
 
 | conv \ alg | global_residual | per_token | arithmetic | momentum | dominant_prefix | delta_decode | amplitude_sort | conv_residual |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -114,7 +73,7 @@ Positive = described beat bare.
 | differential | 50% | 57% | **100%** | 50% | 17% | **100%** | 83% | 86% |
 | ema | 17% | 86% | 67% | 17% | 63% | 86% | 71% | 86% |
 
-### bare vs described delta
+### bare → described delta
 
 Positive = described beat bare.
 
@@ -127,12 +86,51 @@ Positive = described beat bare.
 | differential | 0% | -5% | **+33%** | 0% | -33% | **+33%** | **+33%** | **+36%** |
 | ema | -33% | **+36%** | **+17%** | -33% | **+13%** | **+19%** | **+21%** | **+36%** |
 
-## cross-provider summary
+## openai
 
-Best jaccard score per provider × mode.
+### bare
+
+> **Best:** `identity × conv_residual` — **100%**
+
+| conv \ alg | global_residual | per_token | arithmetic | momentum | dominant_prefix | delta_decode | amplitude_sort | conv_residual |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| identity | 50% | 50% | 50% | 50% | 17% | 17% | 50% | **100%** |
+| gaussian | 50% | 17% | 17% | 50% | 17% | 17% | 50% | 75% |
+| causal | 50% | 17% | 17% | 50% | 17% | 17% | 50% | 17% |
+| uniform | 50% | 17% | 17% | 50% | 17% | 17% | 50% | 86% |
+| differential | 17% | 17% | 17% | 17% | 0% | 67% | 57% | 17% |
+| ema | 17% | 17% | 17% | 50% | 17% | 17% | 57% | 86% |
+
+### described
+
+> **Best:** `differential × arithmetic` — **100%**
+
+| conv \ alg | global_residual | per_token | arithmetic | momentum | dominant_prefix | delta_decode | amplitude_sort | conv_residual |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| identity | 50% | 86% | 63% | 67% | 67% | 63% | 63% | 75% |
+| gaussian | 67% | 50% | 63% | 67% | 67% | 17% | 57% | 63% |
+| causal | 50% | 63% | 75% | 57% | 17% | 63% | 75% | 63% |
+| uniform | 67% | 63% | 75% | 67% | 67% | 63% | 71% | 63% |
+| differential | 71% | 71% | **100%** | 71% | 0% | **100%** | 63% | **100%** |
+| ema | 50% | 75% | 75% | 50% | 50% | 75% | 75% | 75% |
+
+### bare → described delta
+
+Positive = described beat bare.
+
+| conv \ alg | global_residual | per_token | arithmetic | momentum | dominant_prefix | delta_decode | amplitude_sort | conv_residual |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| identity | 0% | **+36%** | **+13%** | **+17%** | **+50%** | **+46%** | **+13%** | -25% |
+| gaussian | **+17%** | **+33%** | **+46%** | **+17%** | **+50%** | 0% | **+7%** | -12% |
+| causal | 0% | **+46%** | **+58%** | **+7%** | 0% | **+46%** | **+25%** | **+46%** |
+| uniform | **+17%** | **+46%** | **+58%** | **+17%** | **+50%** | **+46%** | **+21%** | -23% |
+| differential | **+55%** | **+55%** | **+83%** | **+55%** | 0% | **+33%** | **+5%** | **+83%** |
+| ema | **+33%** | **+58%** | **+58%** | 0% | **+33%** | **+58%** | **+18%** | -11% |
+
+## summary
 
 | provider | bare best | described best |
 | --- | --- | --- |
 | gemini | 100% (`identity × arithmetic`) | 100% (`identity × global_residual`) |
-| openai | 100% (`identity × conv_residual`) | 100% (`differential × arithmetic`) |
 | ollama | 71% (`identity × per_token`) | 100% (`differential × arithmetic`) |
+| openai | 100% (`identity × conv_residual`) | 100% (`differential × arithmetic`) |
