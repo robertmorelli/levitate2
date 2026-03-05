@@ -58,3 +58,5 @@ import "./algorithms/dominant_prefix.js";
 import "./algorithms/delta_decode.js";
 import "./algorithms/amplitude_sort.js";
 import "./algorithms/conv_residual.js";
+import "./algorithms/dynamic_stack_healing.js";
+import "./algorithms/arithmetic_stack_block_healing.js";

@@ -7,9 +7,12 @@
  * Returns null if no segment matches (completely unknown root).
  */
 export function normalize_ptx_token(token: string, vocab: string[]): string | null {
+  if (vocab.includes(token)) return token;
+
   const segs = token.split(".");
   let best = "";
   let bestScore = 0;
+  let bestLen = 0;
 
   for (const v of vocab) {
     const vsegs = v.split(".");
@@ -18,8 +21,9 @@ export function normalize_ptx_token(token: string, vocab: string[]): string | nu
       if (segs[i] === vsegs[i]) score++;
       else break;
     }
-    if (score > bestScore) {
+    if (score > bestScore || (score === bestScore && vsegs.length > bestLen)) {
       bestScore = score;
+      bestLen = vsegs.length;
       best = v;
     }
   }

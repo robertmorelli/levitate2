@@ -20,23 +20,25 @@ import "./algorithms/dominant_prefix.js";
 import "./algorithms/delta_decode.js";
 import "./algorithms/amplitude_sort.js";
 import "./algorithms/conv_residual.js";
+import "./algorithms/dynamic_stack_healing.js";
+import "./algorithms/arithmetic_stack_block_healing.js";
 
 import { lift_all_matrix } from "./lift.js";
 import { tokens_to_ll } from "./utils/tokens_to_ll.js";
 import { registry, conv_registry } from "./utils/registry.js";
+import { compare_ptx } from "./utils/ptx_similarity.js";
 
 const ptxFile = process.argv[2];
 if (!ptxFile) { console.error("Usage: roundtrip.ts <input.ptx>"); process.exit(1); }
 
 const source   = readFileSync(ptxFile, "utf8");
-const srcOps   = ops_of(source);
 const tmp      = mkdtempSync(join(tmpdir(), "levitate-"));
 const matrix   = lift_all_matrix(source);
 
 const alg_names  = [...registry.keys()];
 const conv_names = [...conv_registry.keys()];
 
-console.log(`\nsource: ${srcOps.join(" ")}\n`);
+console.log(`\nsource: ${ptxFile}\n`);
 
 // ── compile every (conv, alg) cell ───────────────────────────────────────────
 const scores: Record<string, Record<string, number>> = {};
@@ -56,7 +58,7 @@ for (const conv of conv_names) {
     const r = spawnSync("node", [resolve("llc.mjs"), llFile, ptxOut], { encoding: "utf8" });
     if (r.status !== 0) { scores[conv]![alg] = 0; continue; }
 
-    const score = jaccard(srcOps, ops_of(readFileSync(ptxOut, "utf8")));
+    const score = compare_ptx(source, readFileSync(ptxOut, "utf8")).score;
     scores[conv]![alg] = score;
     if (score > best_score) { best_score = score; best_cell = `${conv} × ${alg}`; }
   }
@@ -82,24 +84,8 @@ for (const conv of conv_names) {
 }
 
 console.log("─".repeat(ROW + alg_names.length * COL));
-console.log(`\nbest: ${best_cell}  (${(best_score * 100).toFixed(0)}% jaccard)`);
+console.log(`\nbest: ${best_cell}  (${(best_score * 100).toFixed(0)}% similarity)`);
 
 // ── show lifted tokens for best cell ─────────────────────────────────────────
 const [best_conv = "", best_alg = ""] = best_cell.split(" × ");
 console.log(`lifted: ${(matrix[best_conv]?.[best_alg] ?? []).join(" ")}`);
-
-// ── helpers ───────────────────────────────────────────────────────────────────
-function ops_of(ptx: string): string[] {
-  return ptx.split(/\r?\n/)
-    .map(l => l.trim())
-    .filter(l => l && !l.startsWith("//") && !l.startsWith(".") && !l.startsWith("@") && l !== "{" && l !== "}")
-    .map(l => (l.match(/^([a-z][a-z0-9_.]*)/i) ?? [])[1] ?? "")
-    .filter(Boolean);
-}
-
-function jaccard(a: string[], b: string[]): number {
-  const sa = new Set(a), sb = new Set(b);
-  const inter = [...sa].filter(x => sb.has(x)).length;
-  const union = new Set([...sa, ...sb]).size;
-  return union === 0 ? 1 : inter / union;
-}

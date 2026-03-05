@@ -1,130 +1,130 @@
 # Levitate roundtrip results
 
-Averaged jaccard similarity across **16 kernels**: `add_fma.ptx`, `add_fma_rcp.ptx`, `add_mul_rcp.ptx`, `add_only.ptx`, `add_rcp.ptx`, `all_ops.ptx`, `copy.ptx`, `fma_only.ptx`, `fma_rcp.ptx`, `mul_fma.ptx`, `mul_only.ptx`, `mul_rcp.ptx`, `non1to1_fma_source.ptx`, `rcp_only.ptx`, `reference.ptx`, `reference_big.ptx`
+Averaged instruction similarity across **20 kernels**: `add_fma.ptx`, `add_fma_rcp.ptx`, `add_mul_rcp.ptx`, `add_only.ptx`, `add_rcp.ptx`, `all_ops.ptx`, `complex_kernel.ptx`, `copy.ptx`, `fma_only.ptx`, `fma_rcp.ptx`, `medium_blend.ptx`, `medium_int_mix.ptx`, `medium_loop_mix.ptx`, `mul_fma.ptx`, `mul_only.ptx`, `mul_rcp.ptx`, `non1to1_fma_source.ptx`, `rcp_only.ptx`, `reference.ptx`, `reference_big.ptx`
 
-**Metric:** Jaccard similarity on PTX opcode sets (averaged across all kernels)
+**Metric:** Weighted PTX instruction similarity (sequence + multiplicity + set + exact bonus), averaged across kernels
 
 ## gemini
 
 ### bare
 
-> **Best avg:** `uniform × amplitude_sort` — **61%**
+> **Best avg:** `uniform × amplitude_sort` — **46%**
 
-| conv \ alg | global_residual | per_token | arithmetic | arithmetic_opt | momentum | dominant_prefix | delta_decode | amplitude_sort | conv_residual |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| identity | 17% | 31% | 40% | 17% | 17% | 17% | 32% | 56% | 36% |
-| gaussian | 17% | 33% | 31% | 17% | 17% | 17% | 17% | 58% | 33% |
-| causal | 17% | 23% | 17% | 17% | 17% | 17% | 24% | 59% | 27% |
-| uniform | 17% | 44% | 38% | 17% | 17% | 17% | 19% | **61%** | 30% |
-| differential | 47% | 57% | 17% | 0% | 47% | 0% | 25% | 57% | 45% |
-| ema | 17% | 20% | 19% | 17% | 17% | 17% | 32% | 57% | 35% |
+| conv \ alg | global_residual | per_token | arithmetic | arithmetic_opt | momentum | dominant_prefix | delta_decode | amplitude_sort | conv_residual | dynamic_stack_healing | arithmetic_stack_block_healing |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| identity | 16% | 20% | 20% | 16% | 16% | 16% | 21% | 34% | 21% | 18% | 19% |
+| gaussian | 16% | 25% | 23% | 16% | 16% | 16% | 16% | 41% | 17% | 16% | 17% |
+| causal | 16% | 22% | 15% | 16% | 16% | 16% | 18% | 42% | 19% | 16% | 15% |
+| uniform | 16% | 31% | 29% | 16% | 16% | 16% | 17% | **46%** | 20% | 16% | 20% |
+| differential | 24% | 45% | 16% | 0% | 24% | 0% | 21% | 36% | 25% | 0% | 18% |
+| ema | 16% | 18% | 17% | 16% | 16% | 16% | 21% | 41% | 21% | 16% | 16% |
 
 ### described
 
-> **Best avg:** `identity × arithmetic_opt` — **100%**
+> **Best avg:** `identity × arithmetic_opt` — **69%**
 
-| conv \ alg | global_residual | per_token | arithmetic | arithmetic_opt | momentum | dominant_prefix | delta_decode | amplitude_sort | conv_residual |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| identity | 85% | 83% | 80% | **100%** | 89% | 67% | 84% | 78% | 83% |
-| gaussian | 89% | 78% | 79% | 74% | 89% | 53% | 25% | 80% | 80% |
-| causal | 78% | 91% | 82% | 84% | 81% | 68% | 85% | 75% | 78% |
-| uniform | 86% | 84% | 80% | 78% | 85% | 62% | 85% | 77% | 81% |
-| differential | 65% | 76% | 98% | 0% | 65% | 0% | 98% | 79% | 93% |
-| ema | 82% | 77% | 82% | **100%** | 83% | 74% | 85% | 78% | 86% |
+| conv \ alg | global_residual | per_token | arithmetic | arithmetic_opt | momentum | dominant_prefix | delta_decode | amplitude_sort | conv_residual | dynamic_stack_healing | arithmetic_stack_block_healing |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| identity | 57% | 37% | 31% | **69%** | 57% | 49% | 41% | 39% | 40% | 50% | 27% |
+| gaussian | 58% | 37% | 32% | 51% | 57% | 43% | 18% | 39% | 42% | 43% | 29% |
+| causal | 60% | 38% | 31% | 61% | 59% | 52% | 41% | 37% | 40% | 51% | 24% |
+| uniform | 59% | 38% | 33% | 52% | 58% | 47% | 41% | 38% | 41% | 43% | 29% |
+| differential | 46% | 50% | 49% | 0% | 46% | 0% | 49% | 50% | 50% | 0% | 17% |
+| ema | 57% | 38% | 32% | **69%** | 56% | 54% | 43% | 40% | 44% | 50% | 25% |
 
 ### bare → described delta
 
-| conv \ alg | global_residual | per_token | arithmetic | arithmetic_opt | momentum | dominant_prefix | delta_decode | amplitude_sort | conv_residual |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| identity | **+68%** | **+52%** | **+41%** | **+83%** | **+72%** | **+49%** | **+52%** | **+22%** | **+47%** |
-| gaussian | **+71%** | **+45%** | **+48%** | **+56%** | **+71%** | **+36%** | **+8%** | **+22%** | **+47%** |
-| causal | **+61%** | **+68%** | **+64%** | **+67%** | **+64%** | **+50%** | **+60%** | **+16%** | **+51%** |
-| uniform | **+69%** | **+41%** | **+43%** | **+60%** | **+68%** | **+45%** | **+65%** | **+16%** | **+52%** |
-| differential | **+18%** | **+18%** | **+81%** | 0% | **+18%** | 0% | **+73%** | **+22%** | **+49%** |
-| ema | **+65%** | **+57%** | **+63%** | **+83%** | **+65%** | **+57%** | **+53%** | **+21%** | **+51%** |
+| conv \ alg | global_residual | per_token | arithmetic | arithmetic_opt | momentum | dominant_prefix | delta_decode | amplitude_sort | conv_residual | dynamic_stack_healing | arithmetic_stack_block_healing |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| identity | **+42%** | **+18%** | **+11%** | **+53%** | **+41%** | **+33%** | **+20%** | **+5%** | **+19%** | **+32%** | **+8%** |
+| gaussian | **+43%** | **+12%** | **+9%** | **+36%** | **+41%** | **+27%** | **+2%** | -2% | **+25%** | **+27%** | **+12%** |
+| causal | **+44%** | **+16%** | **+16%** | **+45%** | **+44%** | **+36%** | **+24%** | -5% | **+21%** | **+35%** | **+9%** |
+| uniform | **+43%** | **+7%** | **+4%** | **+36%** | **+42%** | **+31%** | **+24%** | -8% | **+21%** | **+28%** | **+9%** |
+| differential | **+22%** | **+5%** | **+33%** | 0% | **+22%** | 0% | **+28%** | **+14%** | **+26%** | 0% | -1% |
+| ema | **+41%** | **+20%** | **+15%** | **+53%** | **+41%** | **+39%** | **+22%** | -1% | **+23%** | **+35%** | **+9%** |
 
 ## ollama
 
 ### bare
 
-> **Best avg:** `identity × per_token` — **64%**
+> **Best avg:** `differential × per_token` — **40%**
 
-| conv \ alg | global_residual | per_token | arithmetic | arithmetic_opt | momentum | dominant_prefix | delta_decode | amplitude_sort | conv_residual |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| identity | 52% | **64%** | **64%** | 17% | 52% | 52% | 60% | 52% | 52% |
-| gaussian | 52% | 52% | 52% | 17% | 52% | 52% | 58% | 52% | 52% |
-| causal | 52% | 52% | 52% | 17% | 52% | 52% | 60% | 52% | 52% |
-| uniform | 52% | 52% | 52% | 17% | 52% | 52% | 60% | 52% | 52% |
-| differential | 52% | 63% | 64% | 0% | 52% | 34% | 63% | 52% | 62% |
-| ema | 52% | 52% | 52% | 17% | 52% | 52% | 60% | 52% | 52% |
+| conv \ alg | global_residual | per_token | arithmetic | arithmetic_opt | momentum | dominant_prefix | delta_decode | amplitude_sort | conv_residual | dynamic_stack_healing | arithmetic_stack_block_healing |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| identity | 26% | 29% | 30% | 16% | 26% | 25% | 40% | 31% | 35% | 16% | 25% |
+| gaussian | 26% | 23% | 31% | 16% | 26% | 26% | 33% | 31% | 34% | 16% | 23% |
+| causal | 27% | 23% | 27% | 16% | 27% | 25% | 40% | 31% | 35% | 16% | 24% |
+| uniform | 26% | 23% | 30% | 16% | 26% | 25% | 38% | 31% | 35% | 16% | 23% |
+| differential | 31% | **40%** | 37% | 0% | 31% | 21% | 37% | 34% | 40% | 0% | 20% |
+| ema | 27% | 24% | 27% | 16% | 27% | 25% | 29% | 31% | 35% | 16% | 24% |
 
 ### described
 
-> **Best avg:** `identity × arithmetic_opt` — **100%**
+> **Best avg:** `identity × arithmetic_opt` — **69%**
 
-| conv \ alg | global_residual | per_token | arithmetic | arithmetic_opt | momentum | dominant_prefix | delta_decode | amplitude_sort | conv_residual |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| identity | 28% | 82% | 75% | **100%** | 22% | 17% | 77% | 75% | 80% |
-| gaussian | 27% | 77% | 73% | 64% | 22% | 17% | 25% | 73% | 78% |
-| causal | 17% | 82% | 61% | 56% | 17% | 17% | 80% | 73% | 75% |
-| uniform | 28% | 82% | 77% | 80% | 25% | 17% | 80% | 73% | 83% |
-| differential | 67% | 76% | 95% | 0% | 67% | 12% | 93% | 69% | 86% |
-| ema | 28% | 90% | 74% | 99% | 22% | 55% | 81% | 76% | 78% |
+| conv \ alg | global_residual | per_token | arithmetic | arithmetic_opt | momentum | dominant_prefix | delta_decode | amplitude_sort | conv_residual | dynamic_stack_healing | arithmetic_stack_block_healing |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| identity | 22% | 39% | 39% | **69%** | 18% | 16% | 41% | 42% | 42% | 43% | 26% |
+| gaussian | 22% | 36% | 33% | 47% | 18% | 16% | 18% | 39% | 46% | 24% | 24% |
+| causal | 15% | 39% | 26% | 42% | 15% | 16% | 42% | 38% | 46% | 36% | 20% |
+| uniform | 22% | 39% | 35% | 59% | 20% | 16% | 41% | 39% | 50% | 29% | 25% |
+| differential | 36% | 49% | 49% | 0% | 36% | 12% | 49% | 43% | 51% | 0% | 17% |
+| ema | 22% | 37% | 43% | 69% | 18% | 37% | 36% | 36% | 45% | 49% | 18% |
 
 ### bare → described delta
 
-| conv \ alg | global_residual | per_token | arithmetic | arithmetic_opt | momentum | dominant_prefix | delta_decode | amplitude_sort | conv_residual |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| identity | -24% | **+18%** | **+11%** | **+83%** | -30% | -35% | **+17%** | **+22%** | **+28%** |
-| gaussian | -25% | **+25%** | **+21%** | **+47%** | -30% | -35% | -33% | **+21%** | **+26%** |
-| causal | -35% | **+30%** | **+9%** | **+39%** | -35% | -35% | **+20%** | **+21%** | **+23%** |
-| uniform | -24% | **+30%** | **+24%** | **+63%** | -27% | -35% | **+20%** | **+21%** | **+31%** |
-| differential | **+14%** | **+13%** | **+31%** | 0% | **+14%** | -22% | **+30%** | **+17%** | **+24%** |
-| ema | -24% | **+38%** | **+22%** | **+82%** | -30% | **+2%** | **+21%** | **+24%** | **+26%** |
+| conv \ alg | global_residual | per_token | arithmetic | arithmetic_opt | momentum | dominant_prefix | delta_decode | amplitude_sort | conv_residual | dynamic_stack_healing | arithmetic_stack_block_healing |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| identity | -4% | **+10%** | **+8%** | **+53%** | -8% | -10% | **+1%** | **+12%** | **+7%** | **+27%** | **+1%** |
+| gaussian | -4% | **+14%** | **+3%** | **+31%** | -8% | -10% | -15% | **+8%** | **+12%** | **+9%** | 0% |
+| causal | -12% | **+16%** | 0% | **+26%** | -12% | -10% | **+2%** | **+7%** | **+12%** | **+21%** | -4% |
+| uniform | -4% | **+15%** | **+6%** | **+43%** | -6% | -10% | **+3%** | **+8%** | **+16%** | **+13%** | **+2%** |
+| differential | **+5%** | **+9%** | **+11%** | 0% | **+5%** | -9% | **+12%** | **+9%** | **+10%** | 0% | -3% |
+| ema | -5% | **+13%** | **+17%** | **+53%** | -9% | **+12%** | **+6%** | **+5%** | **+11%** | **+33%** | -6% |
 
 ## openai
 
 ### bare
 
-> **Best avg:** `differential × amplitude_sort` — **53%**
+> **Best avg:** `differential × amplitude_sort` — **25%**
 
-| conv \ alg | global_residual | per_token | arithmetic | arithmetic_opt | momentum | dominant_prefix | delta_decode | amplitude_sort | conv_residual |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| identity | 17% | 52% | 17% | 15% | 17% | 17% | 17% | 37% | 17% |
-| gaussian | 17% | 17% | 17% | 15% | 17% | 17% | 17% | 32% | 17% |
-| causal | 17% | 17% | 17% | 16% | 17% | 17% | 17% | 33% | 17% |
-| uniform | 17% | 17% | 17% | 16% | 17% | 17% | 17% | 35% | 17% |
-| differential | 23% | 34% | 17% | 0% | 23% | 0% | 17% | **53%** | 17% |
-| ema | 17% | 17% | 17% | 16% | 17% | 17% | 17% | 34% | 17% |
+| conv \ alg | global_residual | per_token | arithmetic | arithmetic_opt | momentum | dominant_prefix | delta_decode | amplitude_sort | conv_residual | dynamic_stack_healing | arithmetic_stack_block_healing |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| identity | 16% | 16% | 16% | 16% | 16% | 16% | 16% | 17% | 16% | 16% | 16% |
+| gaussian | 16% | 16% | 16% | 16% | 16% | 16% | 16% | 16% | 16% | 16% | 16% |
+| causal | 16% | 16% | 16% | 16% | 16% | 16% | 16% | 16% | 16% | 16% | 16% |
+| uniform | 16% | 16% | 16% | 16% | 16% | 16% | 16% | 16% | 16% | 16% | 16% |
+| differential | 16% | 17% | 16% | 0% | 16% | 15% | 16% | **25%** | 16% | 0% | 16% |
+| ema | 16% | 16% | 16% | 16% | 16% | 16% | 16% | 16% | 16% | 16% | 16% |
 
 ### described
 
-> **Best avg:** `identity × arithmetic_opt` — **100%**
+> **Best avg:** `ema × arithmetic_opt` — **64%**
 
-| conv \ alg | global_residual | per_token | arithmetic | arithmetic_opt | momentum | dominant_prefix | delta_decode | amplitude_sort | conv_residual |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| identity | 74% | 52% | 52% | **100%** | 75% | 50% | 52% | 68% | 89% |
-| gaussian | 76% | 80% | 70% | 70% | 75% | 50% | 21% | 78% | 76% |
-| causal | 74% | 79% | 77% | 95% | 77% | 31% | 52% | 73% | 72% |
-| uniform | 76% | 80% | 68% | 66% | 76% | 50% | 52% | 81% | 77% |
-| differential | 17% | 52% | 85% | 0% | 30% | 0% | 85% | 51% | 58% |
-| ema | 73% | 82% | 74% | 96% | 75% | 27% | 94% | 66% | 75% |
+| conv \ alg | global_residual | per_token | arithmetic | arithmetic_opt | momentum | dominant_prefix | delta_decode | amplitude_sort | conv_residual | dynamic_stack_healing | arithmetic_stack_block_healing |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| identity | 25% | 25% | 26% | 64% | 23% | 16% | 37% | 33% | 40% | 63% | 22% |
+| gaussian | 27% | 45% | 45% | 26% | 26% | 16% | 49% | 36% | 36% | 26% | 30% |
+| causal | 17% | 28% | 29% | 64% | 16% | 16% | 39% | 35% | 52% | 62% | 24% |
+| uniform | 27% | 38% | 44% | 37% | 27% | 16% | 42% | 36% | 35% | 37% | 24% |
+| differential | 18% | 36% | 37% | 0% | 18% | 19% | 37% | 35% | 40% | 0% | 20% |
+| ema | 25% | 29% | 29% | **64%** | 25% | 16% | 40% | 39% | 44% | 62% | 22% |
 
 ### bare → described delta
 
-| conv \ alg | global_residual | per_token | arithmetic | arithmetic_opt | momentum | dominant_prefix | delta_decode | amplitude_sort | conv_residual |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| identity | **+57%** | 0% | **+35%** | **+85%** | **+58%** | **+33%** | **+35%** | **+31%** | **+72%** |
-| gaussian | **+59%** | **+62%** | **+53%** | **+55%** | **+58%** | **+33%** | **+3%** | **+46%** | **+58%** |
-| causal | **+57%** | **+62%** | **+60%** | **+79%** | **+60%** | **+13%** | **+35%** | **+40%** | **+54%** |
-| uniform | **+58%** | **+63%** | **+51%** | **+51%** | **+58%** | **+33%** | **+35%** | **+46%** | **+60%** |
-| differential | -5% | **+19%** | **+67%** | 0% | **+8%** | 0% | **+67%** | -2% | **+41%** |
-| ema | **+56%** | **+65%** | **+56%** | **+80%** | **+58%** | **+10%** | **+76%** | **+32%** | **+58%** |
+| conv \ alg | global_residual | per_token | arithmetic | arithmetic_opt | momentum | dominant_prefix | delta_decode | amplitude_sort | conv_residual | dynamic_stack_healing | arithmetic_stack_block_healing |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| identity | **+9%** | **+10%** | **+10%** | **+48%** | **+7%** | 0% | **+21%** | **+17%** | **+24%** | **+48%** | **+7%** |
+| gaussian | **+11%** | **+29%** | **+29%** | **+10%** | **+10%** | 0% | **+34%** | **+21%** | **+20%** | **+10%** | **+15%** |
+| causal | **+1%** | **+12%** | **+13%** | **+48%** | 0% | 0% | **+23%** | **+19%** | **+36%** | **+46%** | **+8%** |
+| uniform | **+11%** | **+22%** | **+28%** | **+21%** | **+11%** | 0% | **+27%** | **+21%** | **+20%** | **+21%** | **+8%** |
+| differential | **+2%** | **+19%** | **+22%** | 0% | **+2%** | **+5%** | **+22%** | **+10%** | **+25%** | 0% | **+5%** |
+| ema | **+9%** | **+14%** | **+14%** | **+49%** | **+10%** | 0% | **+25%** | **+23%** | **+28%** | **+47%** | **+6%** |
 
 ## summary
 
 | provider | bare avg best | described avg best |
 | --- | --- | --- |
-| gemini | 61% (`uniform × amplitude_sort`) | 100% (`identity × arithmetic_opt`) |
-| ollama | 64% (`identity × per_token`) | 100% (`identity × arithmetic_opt`) |
-| openai | 53% (`differential × amplitude_sort`) | 100% (`identity × arithmetic_opt`) |
+| gemini | 46% (`uniform × amplitude_sort`) | 69% (`identity × arithmetic_opt`) |
+| ollama | 40% (`differential × per_token`) | 69% (`identity × arithmetic_opt`) |
+| openai | 25% (`differential × amplitude_sort`) | 64% (`ema × arithmetic_opt`) |

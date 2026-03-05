@@ -25,10 +25,13 @@ import "../algorithms/dominant_prefix.js";
 import "../algorithms/delta_decode.js";
 import "../algorithms/amplitude_sort.js";
 import "../algorithms/conv_residual.js";
+import "../algorithms/dynamic_stack_healing.js";
+import "../algorithms/arithmetic_stack_block_healing.js";
 
 import { lift_all_matrix } from "../lift.js";
 import { tokens_to_ll } from "../utils/tokens_to_ll.js";
 import { registry, conv_registry } from "../utils/registry.js";
+import { compare_ptx } from "../utils/ptx_similarity.js";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -36,21 +39,6 @@ type Scores    = Record<string, Record<string, number>>;
 type VectorSet = { provider: string; mode: string; ptx_path: string; llvm_path: string };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function ops_of(ptx: string): string[] {
-  return ptx.split(/\r?\n/)
-    .map(l => l.trim())
-    .filter(l => l && !l.startsWith("//") && !l.startsWith(".") && !l.startsWith("@") && l !== "{" && l !== "}")
-    .map(l => (l.match(/^([a-z][a-z0-9_.]*)/i) ?? [])[1] ?? "")
-    .filter(Boolean);
-}
-
-function jaccard(a: string[], b: string[]): number {
-  const sa = new Set(a), sb = new Set(b);
-  const inter = [...sa].filter(x => sb.has(x)).length;
-  const union = new Set([...sa, ...sb]).size;
-  return union === 0 ? 1 : inter / union;
-}
 
 function find_vector_sets(): VectorSet[] {
   return readdirSync("utils")
@@ -80,7 +68,6 @@ function run_matrix(vs: VectorSet, source: string, tmp: string, slug: string, al
   process.env["LLVM_VECTORS"] = vs.llvm_path;
 
   const matrix_tokens = lift_all_matrix(source);
-  const src_ops = ops_of(source);
   const scores: Scores = {};
   let best = -1, best_cell = "";
 
@@ -99,7 +86,7 @@ function run_matrix(vs: VectorSet, source: string, tmp: string, slug: string, al
       const r = spawnSync("node", [resolve("llc.mjs"), ll_file, ptx_out], { encoding: "utf8" });
       if (r.status !== 0) { scores[conv]![alg] = 0; continue; }
 
-      const score = jaccard(src_ops, ops_of(readFileSync(ptx_out, "utf8")));
+      const score = compare_ptx(source, readFileSync(ptx_out, "utf8")).score;
       scores[conv]![alg] = score;
       if (score > best) { best = score; best_cell = `${conv} × ${alg}`; }
     }
@@ -229,9 +216,9 @@ function write_readme(
   const lines: string[] = [];
   lines.push(`# Levitate roundtrip results`);
   lines.push(``);
-  lines.push(`Averaged jaccard similarity across **${ptx_files.length} kernels**: ${ptx_files.map(f => `\`${f.replace("examples/","")}\``).join(", ")}`);
+  lines.push(`Averaged instruction similarity across **${ptx_files.length} kernels**: ${ptx_files.map(f => `\`${f.replace("examples/","")}\``).join(", ")}`);
   lines.push(``);
-  lines.push(`**Metric:** Jaccard similarity on PTX opcode sets (averaged across all kernels)`);
+  lines.push(`**Metric:** Weighted PTX instruction similarity (sequence + multiplicity + set + exact bonus), averaged across kernels`);
   lines.push(``);
 
   const providers = [...new Set(provider_modes.map(pm => pm.split("/")[0]!))];
@@ -317,8 +304,7 @@ function write_readme(
   for (const ptx_file of ptx_files) {
     const kernel = ptx_file.replace("examples/", "").replace(".ptx", "");
     const source = readFileSync(ptx_file, "utf8");
-    const src_ops = ops_of(source);
-    console.log(`\n── ${kernel}  [${src_ops.join(" ")}]`);
+    console.log(`\n── ${kernel}`);
 
     const pm_map = new Map<string, Scores>();
 

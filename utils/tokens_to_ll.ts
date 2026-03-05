@@ -9,14 +9,19 @@ export function tokens_to_ll(tokens: string[]): string {
   const ONE_F  = "1.000000e+00";
   const ZERO_I = "0";
   const ONE_I  = "1";
+  const ZERO_I64 = "0";
+  const ONE_I64 = "1";
 
   const float_ptr_ops = tokens.filter((t) => t === "load_float_addrspace1" || t === "store_float_addrspace1").length;
   const int_ptr_ops = tokens.filter((t) => t === "load_i32_addrspace1" || t === "store_i32_addrspace1").length;
+  const i64_ptr_ops = tokens.filter((t) => t === "load_i64_addrspace1" || t === "store_i64_addrspace1").length;
   const numFPtrs = Math.max(3, float_ptr_ops);
   const numIPtrs = Math.max(3, int_ptr_ops);
+  const numI64Ptrs = Math.max(2, i64_ptr_ops);
   const fParams = Array.from({ length: numFPtrs }, (_, i) => `float addrspace(1)* %pf${i}`);
   const iParams = Array.from({ length: numIPtrs }, (_, i) => `i32 addrspace(1)* %pi${i}`);
-  const params = [...fParams, ...iParams].join(", ");
+  const i64Params = Array.from({ length: numI64Ptrs }, (_, i) => `i64 addrspace(1)* %p64${i}`);
+  const params = [...fParams, ...iParams, ...i64Params].join(", ");
 
   let counter = 0;
   const nextReg = (): string => `%v${counter++}`;
@@ -24,15 +29,19 @@ export function tokens_to_ll(tokens: string[]): string {
   // Pools of available SSA names by type.
   const floats: string[] = [];
   const ints: string[] = [];
+  const i64s: string[] = [];
   const preds: string[] = [];
   const fPtrs: string[] = Array.from({ length: numFPtrs }, (_, i) => `%pf${i}`);
   const iPtrs: string[] = Array.from({ length: numIPtrs }, (_, i) => `%pi${i}`);
+  const i64Ptrs: string[] = Array.from({ length: numI64Ptrs }, (_, i) => `%p64${i}`);
 
   const popFloat = (): string => floats.pop() ?? ZERO_F;
   const popInt = (): string => ints.pop() ?? ZERO_I;
+  const popI64 = (): string => i64s.pop() ?? ZERO_I64;
   const popPred = (): string => preds.pop() ?? "false";
   const popFPtr = (): string => fPtrs.pop() ?? "%pf0";
   const popIPtr = (): string => iPtrs.pop() ?? "%pi0";
+  const popI64Ptr = (): string => i64Ptrs.pop() ?? "%p640";
 
   const body: string[] = [];
   let hasRet = false;
@@ -62,6 +71,16 @@ export function tokens_to_ll(tokens: string[]): string {
       }
       case "store_i32_addrspace1": {
         body.push(`  store i32 ${popInt()}, i32 addrspace(1)* ${popIPtr()}`);
+        break;
+      }
+      case "load_i64_addrspace1": {
+        const reg = nextReg();
+        body.push(`  ${reg} = load i64, i64 addrspace(1)* ${popI64Ptr()}`);
+        i64s.push(reg);
+        break;
+      }
+      case "store_i64_addrspace1": {
+        body.push(`  store i64 ${popI64()}, i64 addrspace(1)* ${popI64Ptr()}`);
         break;
       }
       case "fadd_float": {
@@ -141,6 +160,13 @@ export function tokens_to_ll(tokens: string[]): string {
         const b = popFloat(), a = popFloat();
         const reg = nextReg();
         body.push(`  ${reg} = fcmp oeq float ${a}, ${b}`);
+        preds.push(reg);
+        break;
+      }
+      case "fcmp_one_float": {
+        const b = popFloat(), a = popFloat();
+        const reg = nextReg();
+        body.push(`  ${reg} = fcmp one float ${a}, ${b}`);
         preds.push(reg);
         break;
       }
@@ -234,6 +260,62 @@ export function tokens_to_ll(tokens: string[]): string {
         ints.push(reg);
         break;
       }
+      case "mul_i64": {
+        const b = popI64(), a = popI64();
+        const reg = nextReg();
+        body.push(`  ${reg} = mul i64 ${a}, ${b}`);
+        i64s.push(reg);
+        break;
+      }
+      case "add_i64": {
+        const b = popI64(), a = popI64();
+        const reg = nextReg();
+        body.push(`  ${reg} = add i64 ${a}, ${b}`);
+        i64s.push(reg);
+        break;
+      }
+      case "shl_i64": {
+        const shift = popI64(), value = popI64();
+        const reg = nextReg();
+        body.push(`  ${reg} = shl i64 ${value}, ${shift}`);
+        i64s.push(reg);
+        break;
+      }
+      case "ashr_i32": {
+        const shift = popInt(), value = popInt();
+        const reg = nextReg();
+        body.push(`  ${reg} = ashr i32 ${value}, ${shift}`);
+        ints.push(reg);
+        break;
+      }
+      case "icmp_eq_i32": {
+        const b = popInt(), a = popInt();
+        const reg = nextReg();
+        body.push(`  ${reg} = icmp eq i32 ${a}, ${b}`);
+        preds.push(reg);
+        break;
+      }
+      case "icmp_ne_i32": {
+        const b = popInt(), a = popInt();
+        const reg = nextReg();
+        body.push(`  ${reg} = icmp ne i32 ${a}, ${b}`);
+        preds.push(reg);
+        break;
+      }
+      case "icmp_sge_i32": {
+        const b = popInt(), a = popInt();
+        const reg = nextReg();
+        body.push(`  ${reg} = icmp sge i32 ${a}, ${b}`);
+        preds.push(reg);
+        break;
+      }
+      case "select_i32": {
+        const f = popInt(), t = popInt(), c = popPred();
+        const reg = nextReg();
+        body.push(`  ${reg} = select i1 ${c}, i32 ${t}, i32 ${f}`);
+        ints.push(reg);
+        break;
+      }
       case "fptosi_f32_to_i32": {
         const reg = nextReg();
         body.push(`  ${reg} = fptosi float ${popFloat()} to i32`);
@@ -246,9 +328,51 @@ export function tokens_to_ll(tokens: string[]): string {
         floats.push(reg);
         break;
       }
+      case "sext_i32_to_i64": {
+        const reg = nextReg();
+        body.push(`  ${reg} = sext i32 ${popInt()} to i64`);
+        i64s.push(reg);
+        break;
+      }
+      case "zext_i32_to_i64": {
+        const reg = nextReg();
+        body.push(`  ${reg} = zext i32 ${popInt()} to i64`);
+        i64s.push(reg);
+        break;
+      }
+      case "ptrtoint_p1_to_i64": {
+        const reg = nextReg();
+        body.push(`  ${reg} = ptrtoint float addrspace(1)* ${popFPtr()} to i64`);
+        i64s.push(reg);
+        break;
+      }
+      case "inttoptr_i64_to_p1": {
+        const reg = nextReg();
+        body.push(`  ${reg} = inttoptr i64 ${popI64()} to float addrspace(1)*`);
+        fPtrs.push(reg);
+        break;
+      }
+      case "gep_float_idx_i32": {
+        const reg = nextReg();
+        body.push(`  ${reg} = getelementptr float, float addrspace(1)* ${popFPtr()}, i32 ${popInt()}`);
+        fPtrs.push(reg);
+        break;
+      }
+      case "gep_i32_idx_i32": {
+        const reg = nextReg();
+        body.push(`  ${reg} = getelementptr i32, i32 addrspace(1)* ${popIPtr()}, i32 ${popInt()}`);
+        iPtrs.push(reg);
+        break;
+      }
       case "br_uncond": {
         // This emitter currently uses a single basic block. Keep branch tokens
         // as a semantic marker for embedding experiments without emitting CFG.
+        break;
+      }
+      case "br_cond_i1":
+      case "phi_float":
+      case "phi_i32": {
+        // Unsupported control-flow forms in the single-block emitter.
         break;
       }
       case "ret_void": {
