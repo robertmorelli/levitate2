@@ -59,4 +59,5 @@ import "./algorithms/delta_decode.js";
 import "./algorithms/amplitude_sort.js";
 import "./algorithms/conv_residual.js";
 import "./algorithms/dynamic_stack_healing.js";
+import "./algorithms/dynamic_stack_healing_v2.js";
 import "./algorithms/arithmetic_stack_block_healing.js";

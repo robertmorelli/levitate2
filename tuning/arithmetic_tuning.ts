@@ -26,6 +26,63 @@ export interface VectorDictionary {
   findNearest(query: number[]): string;
 }
 
+interface AlignedPair {
+  target: string | null;
+  chosen: string | null;
+}
+
+function align_token_streams(expected: string[], emitted: string[]): AlignedPair[] {
+  const n = expected.length;
+  const m = emitted.length;
+  const dp = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
+
+  for (let i = 0; i <= n; i++) dp[i]![0] = i;
+  for (let j = 0; j <= m; j++) dp[0]![j] = j;
+
+  for (let i = 1; i <= n; i++) {
+    for (let j = 1; j <= m; j++) {
+      const subCost = expected[i - 1] === emitted[j - 1] ? 0 : 1;
+      const sub = (dp[i - 1]?.[j - 1] ?? 0) + subCost;
+      const del = (dp[i - 1]?.[j] ?? 0) + 1;
+      const ins = (dp[i]?.[j - 1] ?? 0) + 1;
+      dp[i]![j] = Math.min(sub, del, ins);
+    }
+  }
+
+  const pairs: AlignedPair[] = [];
+  let i = n;
+  let j = m;
+
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0) {
+      const subCost = expected[i - 1] === emitted[j - 1] ? 0 : 1;
+      if ((dp[i]?.[j] ?? 0) === ((dp[i - 1]?.[j - 1] ?? 0) + subCost)) {
+        pairs.push({ target: expected[i - 1] ?? null, chosen: emitted[j - 1] ?? null });
+        i--;
+        j--;
+        continue;
+      }
+    }
+
+    if (i > 0 && (dp[i]?.[j] ?? 0) === ((dp[i - 1]?.[j] ?? 0) + 1)) {
+      pairs.push({ target: expected[i - 1] ?? null, chosen: null });
+      i--;
+      continue;
+    }
+
+    if (j > 0) {
+      pairs.push({ target: null, chosen: emitted[j - 1] ?? null });
+      j--;
+      continue;
+    }
+
+    break;
+  }
+
+  pairs.reverse();
+  return pairs;
+}
+
 // ============================================================================
 // 1. OMP TUNER (Orthogonal Matching Pursuit with Triplet Loss)
 // 
@@ -37,11 +94,15 @@ export function tune_arithmetic_omp(
   dict: VectorDictionary,
   ptx_context_vectors: number[][],
   expected_llvm_tokens: string[],
+  emitted_llvm_tokens: string[] = [],
   LEARNING_RATE = 0.05,
   MARGIN = 0.1,         // Enforced geometric distance between right and wrong choices
-  THRESHOLD = 0.1
+  THRESHOLD = 0.1,
+  MIN_ALIGNMENT = 0.25
 ) {
-  let expected_idx = 0;
+  const aligned = align_token_streams(expected_llvm_tokens, emitted_llvm_tokens)
+    .filter((pair): pair is { target: string; chosen: string | null } => pair.target !== null);
+  let step_idx = 0;
 
   ptx_context_vectors.forEach((raw_vec) => {
     let mag = vector_norm(raw_vec);
@@ -51,13 +112,19 @@ export function tune_arithmetic_omp(
     let r = raw_vec.map(x => x / mag); 
 
     for (let j = 0; j < 3; j++) {
-      if (mag < THRESHOLD || expected_idx >= expected_llvm_tokens.length) break;
+      if (mag < THRESHOLD || step_idx >= aligned.length) break;
 
-      const chosen_u = dict.findNearest(r);                // What the algorithm guessed (The Negative)
-      const target_u = expected_llvm_tokens[expected_idx]; // What it SHOULD have guessed (The Positive)
+      const pair = aligned[step_idx];
+      if (!pair) break;
+      const target_u = pair.target;
+      const chosen_u = pair.chosen ?? dict.findNearest(r);
 
       let target_vec = dict.getVector(target_u);
       let chosen_vec = dict.getVector(chosen_u);
+      if (target_vec.length === 0) {
+        step_idx++;
+        continue;
+      }
       
       const target_unit = V.normalize(target_vec);
       const chosen_unit = V.normalize(chosen_vec);
@@ -66,6 +133,12 @@ export function tune_arithmetic_omp(
       const sim_target = V.dot(r, target_unit);
       const sim_chosen = V.dot(r, chosen_unit);
 
+      // Tuner-only gate: lower than decode threshold so gradient still flows on weak but informative steps.
+      if (sim_target < MIN_ALIGNMENT) {
+        step_idx++;
+        continue;
+      }
+
       // --- TRIPLET LOSS CHECK ---
       // We only apply a gradient if the algorithm picked the wrong token AND 
       // the wrong token is encroaching on the target's geometric territory (violating the MARGIN).
@@ -73,13 +146,14 @@ export function tune_arithmetic_omp(
         
         // Gradient Ascent: Pull the correct token closer to the residual's direction
         target_vec = V.add(target_vec, V.scale(r, LEARNING_RATE));
-        
-        // Gradient Descent: Push the wrong token away from the residual's direction
-        chosen_vec = V.sub(chosen_vec, V.scale(r, LEARNING_RATE));
 
         // Re-normalize to maintain the spherical geometry required for OMP, then save
         dict.setVector(target_u, V.normalize(target_vec));
-        dict.setVector(chosen_u, V.normalize(chosen_vec));
+        if (chosen_vec.length > 0) {
+          // Gradient Descent: Push the wrong token away from the residual's direction
+          chosen_vec = V.sub(chosen_vec, V.scale(r, LEARNING_RATE));
+          dict.setVector(chosen_u, V.normalize(chosen_vec));
+        }
       }
 
       // --- TEACHER FORCING ---
@@ -95,7 +169,7 @@ export function tune_arithmetic_omp(
       r = V.sub(r, V.scale(fresh_target_unit, alignment));
       r = V.normalize(r); // Laser-focus the remaining orthogonal meaning
       
-      expected_idx++;
+      step_idx++;
     }
   });
 }
@@ -112,6 +186,7 @@ export function tune_dynamic_stack(
   dict: VectorDictionary,
   ptx_block_tokens: string[],    // e.g., ["mul.f32", "add.f32"]
   expected_llvm_block: string[], // e.g., ["fma_float"]
+  emitted_llvm_block: string[] = [],
   LEARNING_RATE = 0.05,
   DECAY_CONSTANT = 0.5,
   HEAL_THRESHOLD = 0.95
@@ -128,22 +203,28 @@ export function tune_dynamic_stack(
     target_stack = V.add(target_stack, V.scale(v_unit, c_k));
   });
 
-  // --- 2. ENCODE THE EMITTED STACK (LLVM) ---
-  // We compress the expected output sequence into a single geometric point.
-  // E = (u0 * 1.0) + (u1 * 0.5) + (u2 * 0.25)
-  let emitted_stack = new Array(dim).fill(0);
+  // --- 2. ENCODE THE EXPECTED + EMITTED STACKS (LLVM) ---
+  let expected_stack = new Array(dim).fill(0);
   expected_llvm_block.forEach((llvm_tok, j) => {
+    const u_unit = V.normalize(dict.getVector(llvm_tok));
+    const c_j = Math.pow(DECAY_CONSTANT, j);
+    expected_stack = V.add(expected_stack, V.scale(u_unit, c_j));
+  });
+
+  let emitted_stack = new Array(dim).fill(0);
+  emitted_llvm_block.forEach((llvm_tok, j) => {
     const u_unit = V.normalize(dict.getVector(llvm_tok));
     const c_j = Math.pow(DECAY_CONSTANT, j);
     emitted_stack = V.add(emitted_stack, V.scale(u_unit, c_j));
   });
 
   const target_unit = V.normalize(target_stack);
+  const expected_unit = V.normalize(expected_stack);
   const emitted_unit = V.normalize(emitted_stack);
 
-  // --- 3. EVALUATE SEQUENCE SYNC ---
-  // Do these two sequences mean the same thing fundamentally?
-  const alignment = V.dot(target_unit, emitted_unit);
+  // --- 3. EVALUATE PREDICTION ERROR ---
+  // Compare what model emitted vs what it should emit.
+  const alignment = V.dot(expected_unit, emitted_unit);
 
   // If the sequences fail to sync up enough to satisfy the checkpoint gate...
   if (alignment < HEAL_THRESHOLD) {

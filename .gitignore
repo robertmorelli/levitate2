@@ -5,6 +5,7 @@ dist/
 # generated roundtrip artifacts
 *.ll
 *.ptx
+tuning/out/
 
 # keep reference examples
 !examples/*.ll

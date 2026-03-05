@@ -6,7 +6,7 @@ export interface PtxSimilarity {
   exact: number;
 }
 
-function instruction_signatures(ptx: string): string[] {
+export function ptx_instruction_signatures(ptx: string): string[] {
   const out: string[] = [];
 
   for (const raw of ptx.split(/\r?\n/)) {
@@ -88,8 +88,8 @@ function lcs_ratio(a: string[], b: string[]): number {
 }
 
 export function compare_ptx(source_ptx: string, candidate_ptx: string): PtxSimilarity {
-  const a = instruction_signatures(source_ptx);
-  const b = instruction_signatures(candidate_ptx);
+  const a = ptx_instruction_signatures(source_ptx);
+  const b = ptx_instruction_signatures(candidate_ptx);
   const set = set_jaccard(a, b);
   const bag = bag_overlap(a, b);
   const seq = lcs_ratio(a, b);
