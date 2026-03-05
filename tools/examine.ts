@@ -3,7 +3,7 @@
  * Examine one conv×alg combination against one or all PTX examples.
  *
  * Usage:
- *   npm run examine -- <conv> <alg> [test]
+ *   npm run examine -- <conv> <alg> [test] [nearest_metric=cosine]
  * Examples:
  *   npm run examine -- identity arithmetic_opt
  *   npm run examine -- gaussian per_token add_fma
@@ -19,10 +19,11 @@ import { lift_all } from "../lift.js";
 import { tokens_to_ll } from "../utils/tokens_to_ll.js";
 import { compare_ptx, ptx_instruction_signatures } from "../utils/ptx_similarity.js";
 import { conv_registry, registry } from "../utils/registry.js";
+import { parse_nearest_metric } from "../utils/find_nearest_token.js";
 
 function usage_and_exit(msg?: string): never {
   if (msg) console.error(msg);
-  console.error("Usage: npm run examine -- <conv> <alg> [test]");
+  console.error("Usage: npm run examine -- <conv> <alg> [test] [nearest_metric=cosine]");
   console.error(`Convs: ${[...conv_registry.keys()].join(", ")}`);
   console.error(`Algs:  ${[...registry.keys()].join(", ")}`);
   process.exit(1);
@@ -80,6 +81,8 @@ function summarize_diff(source: string[], candidate: string[], maxShow = 24): st
 const conv = process.argv[2];
 const alg = process.argv[3];
 const optionalTest = process.argv[4];
+const nearestMetric = parse_nearest_metric(process.argv[5] ?? process.env["NEAREST_METRIC"]);
+process.env["NEAREST_METRIC"] = nearestMetric;
 
 if (!conv || !alg) usage_and_exit();
 if (!conv_registry.has(conv)) usage_and_exit(`Unknown conv: ${conv}`);
@@ -95,6 +98,7 @@ let total = 0;
 let scoreSum = 0;
 
 console.log(`\nexamine: conv=${conv} alg=${alg} tests=${tests.length}\n`);
+console.log(`nearest metric: ${nearestMetric}\n`);
 
 for (const ptxFile of tests) {
   total++;

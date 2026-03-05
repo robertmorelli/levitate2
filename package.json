@@ -15,6 +15,7 @@
     "compare": "tsx tools/compare_embeddings.ts",
     "examine": "tsx tools/examine.ts",
     "tuned": "tsx tools/tuned.ts",
+    "explore:drift": "tsx exploration/semantic_drift_32.ts",
     "bench": "tsx tools/bench.ts",
     "typecheck": "tsc --noEmit"
   },

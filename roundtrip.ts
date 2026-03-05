@@ -2,7 +2,7 @@
 /**
  * Roundtrip harness: PTX → (conv × algorithm) matrix → .ll → llc → PTX → jaccard
  *
- * Usage:  npm run roundtrip <input.ptx>
+ * Usage:  npm run roundtrip <input.ptx> [nearest_metrics=cosine]
  */
 
 import { readFileSync, writeFileSync, mkdtempSync } from "node:fs";
@@ -28,65 +28,74 @@ import { lift_all_matrix } from "./lift.js";
 import { tokens_to_ll } from "./utils/tokens_to_ll.js";
 import { registry, conv_registry } from "./utils/registry.js";
 import { compare_ptx } from "./utils/ptx_similarity.js";
+import { parse_nearest_metric_list } from "./utils/find_nearest_token.js";
 
 const ptxFile = process.argv[2];
 if (!ptxFile) { console.error("Usage: roundtrip.ts <input.ptx>"); process.exit(1); }
+const nearest_metrics = parse_nearest_metric_list(process.argv[3] ?? process.env["NEAREST_METRICS"]);
 
 const source   = readFileSync(ptxFile, "utf8");
 const tmp      = mkdtempSync(join(tmpdir(), "levitate-"));
-const matrix   = lift_all_matrix(source);
 
 const alg_names  = [...registry.keys()];
 const conv_names = [...conv_registry.keys()];
 
-console.log(`\nsource: ${ptxFile}\n`);
+console.log(`\nsource: ${ptxFile}`);
+console.log(`nearest metrics: ${nearest_metrics.join(", ")}\n`);
 
-// ── compile every (conv, alg) cell ───────────────────────────────────────────
-const scores: Record<string, Record<string, number>> = {};
-let best_score = -1, best_cell = "";
+for (const nearest_metric of nearest_metrics) {
+  process.env["NEAREST_METRIC"] = nearest_metric;
+  const matrix = lift_all_matrix(source);
 
-for (const conv of conv_names) {
-  scores[conv] = {};
-  for (const alg of alg_names) {
-    const tokens = matrix[conv]?.[alg] ?? [];
-    if (tokens.length === 0) { scores[conv]![alg] = 0; continue; }
+  // ── compile every (conv, alg) cell ─────────────────────────────────────────
+  const scores: Record<string, Record<string, number>> = {};
+  let best_score = -1;
+  let best_cell = "";
 
-    const ll    = tokens_to_ll(tokens);
-    const llFile = join(tmp, `${conv}_${alg}.ll`);
-    const ptxOut = join(tmp, `${conv}_${alg}.ptx`);
-    writeFileSync(llFile, ll);
+  for (const conv of conv_names) {
+    scores[conv] = {};
+    for (const alg of alg_names) {
+      const tokens = matrix[conv]?.[alg] ?? [];
+      if (tokens.length === 0) { scores[conv]![alg] = 0; continue; }
 
-    const r = spawnSync("node", [resolve("llc.mjs"), llFile, ptxOut], { encoding: "utf8" });
-    if (r.status !== 0) { scores[conv]![alg] = 0; continue; }
+      const ll     = tokens_to_ll(tokens);
+      const llFile = join(tmp, `${nearest_metric}_${conv}_${alg}.ll`);
+      const ptxOut = join(tmp, `${nearest_metric}_${conv}_${alg}.ptx`);
+      writeFileSync(llFile, ll);
 
-    const score = compare_ptx(source, readFileSync(ptxOut, "utf8")).score;
-    scores[conv]![alg] = score;
-    if (score > best_score) { best_score = score; best_cell = `${conv} × ${alg}`; }
+      const r = spawnSync("node", [resolve("llc.mjs"), llFile, ptxOut], { encoding: "utf8" });
+      if (r.status !== 0) { scores[conv]![alg] = 0; continue; }
+
+      const score = compare_ptx(source, readFileSync(ptxOut, "utf8")).score;
+      scores[conv]![alg] = score;
+      if (score > best_score) { best_score = score; best_cell = `${conv} × ${alg}`; }
+    }
   }
-}
 
-// ── print matrix ─────────────────────────────────────────────────────────────
-const COL = 10;
-const ROW = 16;
-
-process.stdout.write("\n" + " ".repeat(ROW));
-for (const alg of alg_names) process.stdout.write(alg.substring(0, COL - 1).padEnd(COL));
-console.log();
-console.log("─".repeat(ROW + alg_names.length * COL));
-
-for (const conv of conv_names) {
-  process.stdout.write(conv.padEnd(ROW));
-  for (const alg of alg_names) {
-    const pct = `${((scores[conv]?.[alg] ?? 0) * 100).toFixed(0)}%`;
-    const cell = scores[conv]?.[alg] === best_score ? `[${pct}]` : ` ${pct} `;
-    process.stdout.write(cell.padEnd(COL));
-  }
+  // ── print matrix ───────────────────────────────────────────────────────────
+  const COL = 10;
+  const ROW = 16;
+  console.log(`nearest metric: ${nearest_metric}`);
+  process.stdout.write("\n" + " ".repeat(ROW));
+  for (const alg of alg_names) process.stdout.write(alg.substring(0, COL - 1).padEnd(COL));
   console.log();
+  console.log("─".repeat(ROW + alg_names.length * COL));
+
+  for (const conv of conv_names) {
+    process.stdout.write(conv.padEnd(ROW));
+    for (const alg of alg_names) {
+      const pct = `${((scores[conv]?.[alg] ?? 0) * 100).toFixed(0)}%`;
+      const cell = scores[conv]?.[alg] === best_score ? `[${pct}]` : ` ${pct} `;
+      process.stdout.write(cell.padEnd(COL));
+    }
+    console.log();
+  }
+
+  console.log("─".repeat(ROW + alg_names.length * COL));
+  console.log(`\nbest (${nearest_metric}): ${best_cell}  (${(best_score * 100).toFixed(0)}% similarity)`);
+
+  // ── show lifted tokens for best cell ───────────────────────────────────────
+  const [best_conv = "", best_alg = ""] = best_cell.split(" × ");
+  console.log(`lifted (${nearest_metric}): ${(matrix[best_conv]?.[best_alg] ?? []).join(" ")}`);
+  console.log("");
 }
-
-console.log("─".repeat(ROW + alg_names.length * COL));
-console.log(`\nbest: ${best_cell}  (${(best_score * 100).toFixed(0)}% similarity)`);
-
-// ── show lifted tokens for best cell ─────────────────────────────────────────
-const [best_conv = "", best_alg = ""] = best_cell.split(" × ");
-console.log(`lifted: ${(matrix[best_conv]?.[best_alg] ?? []).join(" ")}`);

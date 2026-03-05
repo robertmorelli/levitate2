@@ -4,7 +4,7 @@
  * Loads vectors and builds the hnswlib index ONCE, then times only the
  * algorithm execution across all kernels in examples/.
  *
- * Usage: npm run bench [iterations=1000]
+ * Usage: npm run bench [iterations=1000] [nearest_metric=cosine]
  */
 
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
@@ -27,6 +27,7 @@ import { load_lift_vectors } from "../utils/load_lift_vectors.js";
 import { parse_ptx_source } from "../utils/parse_ptx_source.js";
 import { get_vector_dimension } from "../utils/get_vector_dimension.js";
 import { registry, conv_registry, type LiftContext } from "../utils/registry.js";
+import { parse_nearest_metric } from "../utils/find_nearest_token.js";
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
 
@@ -34,13 +35,15 @@ process.env["PTX_VECTORS"]  = "utils/ptx_vectors_gemini_described.json";
 process.env["LLVM_VECTORS"] = "utils/llvm_vectors_gemini_described.json";
 
 const N = parseInt(process.argv[2] ?? "1000", 10);
+const NEAREST_METRIC = parse_nearest_metric(process.argv[3] ?? process.env["NEAREST_METRIC"]);
 const CONV = "identity";
+process.env["NEAREST_METRIC"] = NEAREST_METRIC;
 
 // ── Load once ─────────────────────────────────────────────────────────────────
 
 process.stdout.write("Loading vectors + building index... ");
 const t_load = performance.now();
-const { ptx_vectors, llvm_vectors, find_nearest_llvm } = load_lift_vectors();
+const { ptx_vectors, llvm_vectors, find_nearest_llvm, nearest_metric } = load_lift_vectors();
 const dim = get_vector_dimension(ptx_vectors);
 const conv_fn = conv_registry.get(CONV)!;
 console.log(`${(performance.now() - t_load).toFixed(0)}ms`);
@@ -59,6 +62,7 @@ const ptx_files = readdirSync("examples")
   });
 
 console.log(`Contexts built for ${ptx_files.length} kernels. Running ${N} iterations each.\n`);
+console.log(`Nearest metric: ${nearest_metric}\n`);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -135,6 +139,7 @@ md.push(``);
 md.push(`**Vectors:** \`gemini_described\`  `);
 md.push(`**Convolution:** \`${CONV}\`  `);
 md.push(`**Iterations:** ${N} per kernel  `);
+md.push(`**Nearest Metric:** \`${nearest_metric}\`  `);
 md.push(`**Index load:** ${index_ms}ms (one-time, not included in algorithm times)  `);
 md.push(``);
 md.push(`All times are median wall-clock for a single algorithm call (index already built).`);

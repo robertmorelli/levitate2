@@ -3,11 +3,12 @@
  * Runs the full conv×alg roundtrip matrix across every PTX file in examples/
  * and every vector set in utils/, then writes:
  *   FULL_RESULTS.md  — per-kernel breakdown for every provider × mode
- *   README.md        — averaged summary across all kernels
+  *   README.md        — averaged summary across all kernels
  *
  * Never calls any embedding API. Run `npm run refresh` first if needed.
  *
- * Usage: tsx tools/compare_embeddings.ts
+ * Usage: tsx tools/compare_embeddings.ts [nearest_metrics=all registered]
+ * Example: tsx tools/compare_embeddings.ts cosine,l2,ip
  */
 
 import { writeFileSync, readFileSync, mkdtempSync, readdirSync } from "node:fs";
@@ -33,6 +34,7 @@ import { lift_all_matrix } from "../lift.js";
 import { tokens_to_ll } from "../utils/tokens_to_ll.js";
 import { registry, conv_registry } from "../utils/registry.js";
 import { compare_ptx } from "../utils/ptx_similarity.js";
+import { NEAREST_METRICS, parse_nearest_metric_list } from "../utils/find_nearest_token.js";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -213,6 +215,7 @@ function write_readme(
   alg_names: string[],
   conv_names: string[],
   provider_modes: string[],
+  nearest_metrics: string[],
 ) {
   const lines: string[] = [];
   lines.push(`# Levitate roundtrip results`);
@@ -220,6 +223,7 @@ function write_readme(
   lines.push(`Averaged instruction similarity across **${ptx_files.length} kernels**: ${ptx_files.map(f => `\`${f.replace("examples/","")}\``).join(", ")}`);
   lines.push(``);
   lines.push(`**Metric:** Weighted PTX instruction similarity (sequence + multiplicity + set + exact bonus), averaged across kernels`);
+  lines.push(`**Nearest metrics tested:** ${nearest_metrics.map(m => `\`${m}\``).join(", ")}`);
   lines.push(``);
 
   const providers = [...new Set(provider_modes.map(pm => pm.split("/")[0]!))];
@@ -285,6 +289,14 @@ function write_readme(
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 (async () => {
+  const nearest_metrics = parse_nearest_metric_list(
+    process.argv[2] ?? process.env["NEAREST_METRICS"] ?? NEAREST_METRICS.join(",")
+  );
+  if (nearest_metrics.length === 0) {
+    console.error("No nearest metrics requested. Example: tsx tools/compare_embeddings.ts cosine,l2");
+    process.exit(1);
+  }
+
   const vector_sets = find_vector_sets();
   const ptx_files   = find_ptx_files();
 
@@ -293,9 +305,9 @@ function write_readme(
   const tmp        = mkdtempSync(join(tmpdir(), "levitate-"));
   const alg_names  = [...registry.keys()];
   const conv_names = [...conv_registry.keys()];
-  const pm_labels  = [...new Set(vector_sets.map(v => `${v.provider}/${v.mode}`))];
+  const pm_labels  = [...new Set(vector_sets.flatMap(v => nearest_metrics.map(m => `${v.provider}@${m}/${v.mode}`)))];
 
-  console.log(`\n${ptx_files.length} kernels × ${vector_sets.length} vector sets × ${conv_names.length} convs × ${alg_names.length} algs\n`);
+  console.log(`\n${ptx_files.length} kernels × ${vector_sets.length} vector sets × ${nearest_metrics.length} nearest metrics × ${conv_names.length} convs × ${alg_names.length} algs\n`);
 
   // kernel → provider_mode → scores
   const all_results   = new Map<string, Map<string, Scores>>();
@@ -310,18 +322,21 @@ function write_readme(
     const pm_map = new Map<string, Scores>();
 
     for (const vs of vector_sets) {
-      const pm  = `${vs.provider}/${vs.mode}`;
-      const slug = `${kernel}_${vs.provider}_${vs.mode}`;
-      process.stdout.write(`  ${pm}: `);
-      const scores = run_matrix(vs, source, tmp, slug, alg_names, conv_names);
-      pm_map.set(pm, scores);
-      if (!pm_all_scores.has(pm)) pm_all_scores.set(pm, []);
-      pm_all_scores.get(pm)!.push(scores);
+      for (const nearest_metric of nearest_metrics) {
+        process.env["NEAREST_METRIC"] = nearest_metric;
+        const pm  = `${vs.provider}@${nearest_metric}/${vs.mode}`;
+        const slug = `${kernel}_${vs.provider}_${vs.mode}_${nearest_metric}`;
+        process.stdout.write(`  ${pm}: `);
+        const scores = run_matrix(vs, source, tmp, slug, alg_names, conv_names);
+        pm_map.set(pm, scores);
+        if (!pm_all_scores.has(pm)) pm_all_scores.set(pm, []);
+        pm_all_scores.get(pm)!.push(scores);
+      }
     }
 
     all_results.set(kernel, pm_map);
   }
 
   write_full_results(all_results, alg_names, conv_names, pm_labels);
-  write_readme(ptx_files, pm_all_scores, alg_names, conv_names, pm_labels);
+  write_readme(ptx_files, pm_all_scores, alg_names, conv_names, pm_labels, nearest_metrics);
 })();

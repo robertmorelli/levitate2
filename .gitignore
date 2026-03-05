@@ -6,6 +6,7 @@ dist/
 *.ll
 *.ptx
 tuning/out/
+exploration/out/
 
 # keep reference examples
 !examples/*.ll
