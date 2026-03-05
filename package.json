@@ -11,7 +11,7 @@
   },
   "scripts": {
     "roundtrip": "tsx roundtrip.ts",
-    "embed": "tsx tools/embed_vocab.ts",
+    "refresh": "tsx tools/refresh_vectors.ts",
     "compare": "tsx tools/compare_embeddings.ts",
     "typecheck": "tsc --noEmit"
   },
