@@ -8,8 +8,10 @@ export interface LiftVectors {
 }
 
 export function load_lift_vectors(): LiftVectors {
-  const ptx_vectors  = load_vector_map("utils/ptx_vectors.json");
-  const llvm_vectors = load_vector_map("utils/llvm_vectors.json");
+  const ptx_path  = process.env["PTX_VECTORS"]  ?? "utils/ptx_vectors_gemini_described.json";
+  const llvm_path = process.env["LLVM_VECTORS"] ?? "utils/llvm_vectors_gemini_described.json";
+  const ptx_vectors  = load_vector_map(ptx_path);
+  const llvm_vectors = load_vector_map(llvm_path);
   const find_nearest_llvm = build_nearest_token_fn(llvm_vectors);
   return { ptx_vectors, llvm_vectors, find_nearest_llvm };
 }
