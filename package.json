@@ -10,17 +10,16 @@
     "example": "examples"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "sqstart": "npm run embed:tokens && node mvp.mjs embed",
-    "embed:tokens": "node tools/embed_instruction_vectors.mjs",
-    "vectors:utils": "node tools/write_utils_vectors.mjs"
+    "roundtrip": "tsx roundtrip.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "hnswlib-wasm": "^0.8.2",
+    "hnswlib-node": "^3.0.0",
     "undici-types": "^7.18.2"
   },
   "devDependencies": {
     "@types/node": "^25.3.3",
+    "tsx": "^4.19.3",
     "typescript": "^5.9.3"
   }
 }

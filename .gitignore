@@ -1,0 +1,10 @@
+node_modules/
+dist/
+
+# generated roundtrip artifacts
+*.ll
+*.ptx
+
+# keep reference examples
+!examples/*.ll
+!examples/*.ptx
