@@ -10,9 +10,19 @@
  * Usage: tsx tools/refresh_vectors.ts
  */
 
-import { writeFileSync } from "node:fs";
+import { writeFileSync, readFileSync, existsSync } from "node:fs";
 import { PTX_DESCRIPTIONS, LLVM_DESCRIPTIONS } from "../utils/token_descriptions.js";
 import { make_gemini, make_openai, make_ollama, type EmbedFn } from "../utils/embed_providers.js";
+
+// Load .env if present (no spaces around = required)
+if (existsSync(".env")) {
+  for (const line of readFileSync(".env", "utf8").split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) continue;
+    const [k, ...rest] = trimmed.split("=");
+    if (k && !process.env[k.trim()]) process.env[k.trim()] = rest.join("=").trim();
+  }
+}
 
 const ptx_tokens  = Object.keys(PTX_DESCRIPTIONS);
 const llvm_tokens = Object.keys(LLVM_DESCRIPTIONS);
@@ -40,30 +50,41 @@ async function embed_and_write(embed: EmbedFn, provider: string, mode: "bare" | 
 }
 
 async function detect_providers(): Promise<Array<{ name: string; embed: EmbedFn }>> {
+  // REFRESH_PROVIDER=gemini,openai  (comma-separated, or "all" / unset for all)
+  const only = (process.env["REFRESH_PROVIDER"] ?? "all")
+    .split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+  const want = (name: string) => only.includes("all") || only.includes(name);
+
   const out: Array<{ name: string; embed: EmbedFn }> = [];
 
-  const gemini_key = process.env["GEMINI_API_KEY"] ?? process.env["GEMINI_TOKEN"];
-  if (gemini_key) { console.log("  gemini: key found"); out.push({ name: "gemini", embed: make_gemini(gemini_key) }); }
-  else console.log("  gemini: no GEMINI_API_KEY");
+  if (want("gemini")) {
+    const gemini_key = process.env["GEMINI_API_KEY"] ?? process.env["GEMINI_TOKEN"];
+    if (gemini_key) { console.log("  gemini: key found"); out.push({ name: "gemini", embed: make_gemini(gemini_key) }); }
+    else console.log("  gemini: no GEMINI_API_KEY");
+  }
 
-  const openai_key = process.env["OPENAI_API_KEY"];
-  if (openai_key) { console.log("  openai: key found"); out.push({ name: "openai", embed: make_openai(openai_key) }); }
-  else console.log("  openai: no OPENAI_API_KEY");
+  if (want("openai")) {
+    const openai_key = process.env["OPENAI_API_KEY"];
+    if (openai_key) { console.log("  openai: key found"); out.push({ name: "openai", embed: make_openai(openai_key) }); }
+    else console.log("  openai: no OPENAI_API_KEY");
+  }
 
-  try {
-    const r = await fetch("http://localhost:11434/api/tags", { signal: AbortSignal.timeout(3000) });
-    if (r.ok) {
-      const data = await r.json() as { models: { name: string }[] };
-      const model = data.models.find(m => m.name.startsWith("nomic-embed-text") || m.name.startsWith("bge-small"));
-      if (model) {
-        const m = model.name.split(":")[0]!;
-        console.log(`  ollama: found ${model.name}`);
-        out.push({ name: "ollama", embed: make_ollama(m) });
-      } else {
-        console.log("  ollama: running but no embedding model (need nomic-embed-text or bge-small-en-v1.5)");
+  if (want("ollama")) {
+    try {
+      const r = await fetch("http://localhost:11434/api/tags", { signal: AbortSignal.timeout(3000) });
+      if (r.ok) {
+        const data = await r.json() as { models: { name: string }[] };
+        const model = data.models.find(m => m.name.startsWith("nomic-embed-text") || m.name.startsWith("bge-small"));
+        if (model) {
+          const m = model.name.split(":")[0]!;
+          console.log(`  ollama: found ${model.name}`);
+          out.push({ name: "ollama", embed: make_ollama(m) });
+        } else {
+          console.log("  ollama: running but no embedding model (need nomic-embed-text or bge-small-en-v1.5)");
+        }
       }
-    }
-  } catch { console.log("  ollama: not reachable"); }
+    } catch { console.log("  ollama: not reachable"); }
+  }
 
   return out;
 }
@@ -78,8 +99,12 @@ async function detect_providers(): Promise<Array<{ name: string; embed: EmbedFn 
 
   console.log("\n=== Embedding vocab ===\n");
   for (const { name, embed } of providers) {
-    await embed_and_write(embed, name, "bare");
-    await embed_and_write(embed, name, "described");
+    try {
+      await embed_and_write(embed, name, "bare");
+      await embed_and_write(embed, name, "described");
+    } catch (err) {
+      console.error(`  [${name}] failed, skipping: ${(err as Error).message}`);
+    }
   }
 
   console.log("\nDone. Run: npm run compare examples/<file>.ptx");

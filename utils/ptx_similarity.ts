@@ -26,7 +26,11 @@ export function ptx_instruction_signatures(ptx: string): string[] {
 
     const m = line.match(/^([a-z][a-z0-9_.]*)\s*(.*)$/i);
     if (!m) continue;
-    const op = (m[1] ?? "").toLowerCase();
+    // Canonicalize bitwidth type qualifiers: .b32 → .u32, .b64 → .u64
+    // Signed (.s) and float (.f) qualifiers are preserved as-is.
+    const op = (m[1] ?? "").toLowerCase()
+      .replace(/\.b(32)\b/g, ".u32")
+      .replace(/\.b(64)\b/g, ".u64");
     const rest = ((m[2] ?? "").replace(/;$/, "")).trim();
 
     const operands = rest ? rest.split(",").map(s => s.trim()).filter(Boolean) : [];

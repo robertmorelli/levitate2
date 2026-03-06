@@ -2,38 +2,38 @@
 
 **Vectors:** `gemini_described`  
 **Convolution:** `identity`  
-**Iterations:** 1 per kernel  
-**Nearest Metric:** `l2`  
-**Index load:** 32373ms (one-time, not included in algorithm times)  
+**Iterations:** 1000 per kernel  
+**Nearest Metric:** `cosine`  
+**Index load:** 6196610ms (one-time, not included in algorithm times)  
 
 All times are median wall-clock for a single algorithm call (index already built).
 
 | kernel (tokens) | global_residual | per_token | arithmetic | arithmetic_opt | momentum | dominant_prefix | delta_decode | amplitude_sort | conv_residual | dynamic_stack_healing | dynamic_stack_healing_v2 | arithmetic_stack_block_healing |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| add_fma (11) | 2.70ms | 6.23ms | 10.05ms | 6.54ms | 3.04ms | 2.07ms | 5.42ms | 9.13ms | 9.46ms | 28.54ms | 39.76ms | 18.86ms |
-| add_fma_rcp (12) | 2.12ms | 7.04ms | 11.40ms | 6.91ms | 3.51ms | 2.36ms | 7.00ms | 7.89ms | 5.74ms | 29.64ms | 44.22ms | 18.58ms |
-| add_mul_rcp (12) | 2.12ms | 7.09ms | 11.28ms | 6.50ms | 2.63ms | 2.31ms | 6.42ms | 7.61ms | 5.85ms | 29.87ms | 44.01ms | 20.95ms |
-| add_only (8) | 1.51ms | 5.80ms | 7.59ms | 4.39ms | 1.86ms | 1.54ms | 4.53ms | 5.24ms | 4.43ms | 18.68ms | 27.48ms | 12.55ms |
-| add_rcp (9) | 1.90ms | 6.61ms | 8.23ms | 4.91ms | 2.10ms | 1.69ms | 5.68ms | 6.53ms | 4.14ms | 20.87ms | 32.02ms | 12.65ms |
-| all_ops (13) | 2.36ms | 7.92ms | 12.25ms | 7.71ms | 3.02ms | 2.95ms | 7.41ms | 8.95ms | 6.37ms | 33.50ms | 51.89ms | 19.27ms |
-| complex_kernel (30) | 6.04ms | 18.22ms | 28.28ms | 16.47ms | 6.44ms | 5.85ms | 16.95ms | 19.62ms | 14.52ms | 85.47ms | 137.04ms | 37.48ms |
-| copy (5) | 876µs | 3.11ms | 4.82ms | 2.85ms | 1.05ms | 1.04ms | 3.20ms | 3.10ms | 2.34ms | 8.71ms | 13.15ms | 6.23ms |
-| fma_only (10) | 1.76ms | 6.70ms | 9.74ms | 5.98ms | 2.17ms | 2.05ms | 4.65ms | 6.83ms | 4.88ms | 24.17ms | 34.90ms | 12.91ms |
-| fma_rcp (11) | 1.99ms | 7.25ms | 10.38ms | 6.35ms | 2.35ms | 2.17ms | 5.60ms | 6.95ms | 5.10ms | 26.26ms | 39.07ms | 17.98ms |
-| medium_blend (18) | 3.14ms | 10.79ms | 16.19ms | 10.01ms | 4.09ms | 3.59ms | 13.52ms | 11.40ms | 8.70ms | 46.86ms | 73.83ms | 24.94ms |
-| medium_int_mix (15) | 2.97ms | 8.89ms | 14.05ms | 8.30ms | 3.42ms | 2.82ms | 8.24ms | 9.44ms | 7.30ms | 38.97ms | 59.98ms | 19.06ms |
-| medium_loop_mix (22) | 3.86ms | 14.03ms | 20.26ms | 12.04ms | 4.86ms | 4.23ms | 16.12ms | 13.91ms | 10.42ms | 58.96ms | 93.91ms | 31.18ms |
-| mul_fma (11) | 2.12ms | 6.64ms | 9.87ms | 6.18ms | 2.41ms | 2.17ms | 5.62ms | 7.43ms | 5.22ms | 26.70ms | 42.36ms | 18.54ms |
-| mul_only (8) | 1.40ms | 5.39ms | 7.50ms | 4.83ms | 1.76ms | 1.68ms | 4.29ms | 5.09ms | 3.76ms | 17.62ms | 28.35ms | 12.46ms |
-| mul_rcp (9) | 1.60ms | 5.56ms | 8.15ms | 4.96ms | 1.89ms | 1.68ms | 5.24ms | 6.08ms | 4.66ms | 20.98ms | 33.43ms | 12.53ms |
-| non1to1_fma_source (8) | 1.39ms | 4.98ms | 7.22ms | 4.23ms | 1.79ms | 1.81ms | 4.32ms | 4.90ms | 3.61ms | 17.99ms | 28.47ms | 12.34ms |
-| rcp_only (6) | 1.10ms | 3.71ms | 5.43ms | 3.29ms | 1.28ms | 1.20ms | 4.31ms | 3.90ms | 2.75ms | 11.98ms | 19.07ms | 12.73ms |
-| reference (9) | 1.61ms | 5.30ms | 8.10ms | 5.01ms | 2.04ms | 1.68ms | 5.25ms | 5.62ms | 4.18ms | 21.33ms | 32.23ms | 12.28ms |
-| reference_big (11) | 1.97ms | 6.69ms | 10.21ms | 6.37ms | 2.39ms | 2.05ms | 8.11ms | 7.16ms | 4.95ms | 27.76ms | 42.94ms | 18.96ms |
+| add_fma (11) | 3.49ms | 10.87ms | 14.58ms | 9.13ms | 3.74ms | 3.56ms | 16.02ms | 11.14ms | 7.04ms | 28.94ms | 85.64ms | 25.46ms |
+| add_fma_rcp (12) | 3.89ms | 12.22ms | 13.27ms | 10.18ms | 4.34ms | 4.00ms | 13.28ms | 12.63ms | 8.85ms | 29.84ms | 90.03ms | 20.01ms |
+| add_mul_rcp (12) | 3.73ms | 11.14ms | 12.57ms | 8.09ms | 4.15ms | 3.86ms | 12.85ms | 12.27ms | 8.60ms | 29.14ms | 89.67ms | 19.99ms |
+| add_only (8) | 2.48ms | 7.41ms | 8.33ms | 5.36ms | 2.75ms | 2.58ms | 8.57ms | 8.17ms | 5.81ms | 18.70ms | 56.35ms | 13.39ms |
+| add_rcp (9) | 2.84ms | 8.50ms | 9.54ms | 6.12ms | 3.15ms | 2.94ms | 9.74ms | 9.31ms | 6.51ms | 21.24ms | 64.78ms | 13.40ms |
+| all_ops (13) | 4.10ms | 12.25ms | 13.85ms | 8.91ms | 4.56ms | 4.34ms | 14.19ms | 13.51ms | 9.46ms | 32.52ms | 101.37ms | 20.18ms |
+| complex_kernel (62) | 19.40ms | 58.30ms | 65.90ms | 42.33ms | 21.73ms | 21.02ms | 57.64ms | 64.34ms | 46.12ms | 172.41ms | 548.99ms | 86.67ms |
+| copy (5) | 1.55ms | 4.96ms | 6.53ms | 4.05ms | 1.73ms | 1.62ms | 5.35ms | 5.10ms | 3.50ms | 9.08ms | 29.12ms | 6.58ms |
+| fma_only (10) | 3.11ms | 9.37ms | 10.51ms | 6.82ms | 3.45ms | 3.22ms | 10.78ms | 10.23ms | 7.17ms | 23.07ms | 73.14ms | 13.35ms |
+| fma_rcp (11) | 3.43ms | 10.28ms | 11.51ms | 7.40ms | 3.80ms | 3.55ms | 11.88ms | 11.32ms | 7.93ms | 26.70ms | 84.93ms | 19.97ms |
+| medium_blend (36) | 11.30ms | 33.64ms | 37.92ms | 24.25ms | 12.48ms | 11.60ms | 33.40ms | 36.90ms | 26.28ms | 100.37ms | 317.81ms | 53.16ms |
+| medium_int_mix (33) | 10.33ms | 30.72ms | 35.80ms | 23.04ms | 11.92ms | 10.75ms | 30.24ms | 33.89ms | 24.14ms | 86.96ms | 274.70ms | 46.54ms |
+| medium_loop_mix (41) | 12.75ms | 38.42ms | 42.94ms | 27.48ms | 14.14ms | 13.34ms | 37.72ms | 41.85ms | 29.93ms | 111.08ms | 355.35ms | 60.54ms |
+| mul_fma (11) | 3.44ms | 10.43ms | 11.73ms | 7.63ms | 3.88ms | 3.57ms | 11.98ms | 11.33ms | 7.98ms | 26.89ms | 85.76ms | 20.05ms |
+| mul_only (8) | 2.52ms | 7.53ms | 8.47ms | 5.41ms | 2.80ms | 2.60ms | 8.69ms | 8.28ms | 5.82ms | 17.76ms | 55.91ms | 13.52ms |
+| mul_rcp (9) | 2.84ms | 8.49ms | 9.56ms | 6.09ms | 3.15ms | 2.91ms | 9.74ms | 9.25ms | 6.53ms | 20.88ms | 66.27ms | 13.46ms |
+| non1to1_fma_source (8) | 2.52ms | 7.56ms | 8.51ms | 5.47ms | 2.80ms | 2.62ms | 6.54ms | 8.28ms | 5.77ms | 18.12ms | 57.10ms | 13.44ms |
+| rcp_only (6) | 1.90ms | 5.66ms | 6.33ms | 4.08ms | 2.11ms | 1.96ms | 6.54ms | 6.21ms | 4.30ms | 12.51ms | 39.61ms | 13.21ms |
+| reference (9) | 2.86ms | 8.50ms | 9.52ms | 6.12ms | 3.15ms | 2.94ms | 9.78ms | 9.30ms | 6.50ms | 21.35ms | 67.63ms | 13.50ms |
+| reference_big (11) | 3.47ms | 10.37ms | 11.60ms | 7.46ms | 3.81ms | 3.57ms | 9.78ms | 11.33ms | 7.95ms | 26.86ms | 85.50ms | 19.82ms |
 
 ## aggregate
 
 | stat | global_residual | per_token | arithmetic | arithmetic_opt | momentum | dominant_prefix | delta_decode | amplitude_sort | conv_residual | dynamic_stack_healing | dynamic_stack_healing_v2 | arithmetic_stack_block_healing |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| **median** | **1.99ms** | **6.69ms** | **10.05ms** | **6.35ms** | **2.39ms** | **2.07ms** | **5.62ms** | **7.16ms** | **5.10ms** | **26.70ms** | **39.76ms** | **18.54ms** |
-| p95 | 6.04ms | 18.22ms | 28.28ms | 16.47ms | 6.44ms | 5.85ms | 16.95ms | 19.62ms | 14.52ms | 85.47ms | 137.04ms | 37.48ms |
+| **median** | **3.42ms** | **10.28ms** | **11.53ms** | **7.43ms** | **3.77ms** | **3.53ms** | **11.69ms** | **11.17ms** | **7.82ms** | **26.66ms** | **84.81ms** | **19.79ms** |
+| p95 | 19.16ms | 57.37ms | 65.26ms | 41.75ms | 21.30ms | 20.69ms | 56.74ms | 63.14ms | 45.51ms | 169.39ms | 541.09ms | 85.20ms |

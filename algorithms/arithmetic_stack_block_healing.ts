@@ -21,7 +21,7 @@ register("arithmetic_stack_block_healing", (ctx, tokens) => {
     const chunk_vectors = context_vectors.slice(i, i + CHUNK_SIZE);
     if (chunk_vectors.length === 0) continue;
 
-    const dim = chunk_vectors[0]?.length || 384;
+    const dim = ctx.dim;
 
     // 1. Build the Checkpoint Target (Encode Last-to-First)
     // Formula: T = v_0 + c*v_1 + c^2*v_2 ...

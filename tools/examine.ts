@@ -20,6 +20,9 @@ import { tokens_to_ll } from "../utils/tokens_to_ll.js";
 import { compare_ptx, ptx_instruction_signatures } from "../utils/ptx_similarity.js";
 import { conv_registry, registry } from "../utils/registry.js";
 import { parse_nearest_metric } from "../utils/find_nearest_token.js";
+import { parse_ptx_source } from "../utils/parse_ptx_source.js";
+import { load_vector_map } from "../utils/load_vector_map.js";
+import { ensure_vocab } from "../utils/ensure_vocab.js";
 
 function usage_and_exit(msg?: string): never {
   if (msg) console.error(msg);
@@ -90,6 +93,14 @@ if (!registry.has(alg)) usage_and_exit(`Unknown alg: ${alg}`);
 
 const tests = resolve_tests(optionalTest);
 if (tests.length === 0) usage_and_exit("No PTX tests found.");
+
+// Pre-flight: embed any tokens that appear in PTX sources but are missing from vocab
+{
+  const ptx_path = process.env["PTX_VECTORS"] ?? "utils/ptx_vectors_gemini_described.json";
+  const ptx_vecs = load_vector_map(ptx_path);
+  const all_tokens = tests.flatMap(f => parse_ptx_source(readFileSync(f, "utf8"), ptx_vecs));
+  await ensure_vocab(all_tokens);
+}
 
 const tmp = mkdtempSync(join(tmpdir(), "levitate-examine-"));
 let passed = 0;

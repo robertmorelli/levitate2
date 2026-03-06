@@ -6,8 +6,10 @@
 export const PTX_DESCRIPTIONS: Record<string, string> = {
   // Float arithmetic
   "add.f32":        "PTX add.f32: add two f32 registers",
+  "add.rn.f32":     "PTX add.rn.f32: add two f32 registers with explicit round to nearest mode",
   "sub.f32":        "PTX sub.f32: subtract two f32 registers",
   "mul.f32":        "PTX mul.f32: multiply two f32 registers",
+  "mul.rn.f32":     "PTX mul.rn.f32: multiply two f32 registers with explicit round to nearest mode",
   "fma.rn.f32":     "PTX fma.rn.f32: fused multiply add on f32 with round to nearest",
   "div.rn.f32":     "PTX div.rn.f32: divide one f32 by another",
   "rcp.rn.f32":     "PTX rcp.rn.f32: reciprocal of f32 value",
@@ -36,6 +38,7 @@ export const PTX_DESCRIPTIONS: Record<string, string> = {
   "mov.u32":        "PTX mov.u32: move unsigned 32 bit register value",
 
   // Predicate and control
+  "selp.b32":       "PTX selp.b32: select 32 bit integer value by predicate register",
   "setp.eq.b32":    "PTX setp.eq.b32: predicate set if 32 bit values are equal",
   "setp.ne.s32":    "PTX setp.ne.s32: predicate set if signed 32 bit values are not equal",
   "setp.ge.s32":    "PTX setp.ge.s32: predicate set if signed 32 bit greater or equal",
@@ -53,15 +56,18 @@ export const PTX_DESCRIPTIONS: Record<string, string> = {
   "cvt.u64.u32":    "PTX cvt.u64.u32: zero extend u32 to u64",
 
   // Memory and addressing
-  "ld.param.u64":       "PTX ld.param.u64: load 64 bit argument from parameter space",
-  "ld.param.u32":       "PTX ld.param.u32: load 32 bit argument from parameter space",
-  "cvta.to.global.u64": "PTX cvta.to.global.u64: convert generic pointer to global memory address",
+  "ld.param.u64":       "PTX ld.param.u64: load 64 bit unsigned pointer argument from kernel parameter space",
+  "ld.param.b64":       "PTX ld.param.b64: load 64 bit raw bits pointer argument from kernel parameter space",
+  "ld.param.u32":       "PTX ld.param.u32: load 32 bit unsigned integer argument from kernel parameter space",
+  "cvta.to.global.u64": "PTX cvta.to.global.u64: convert generic address to global memory space pointer",
   "ld.global.f32":      "PTX ld.global.f32: load f32 from global memory",
   "st.global.f32":      "PTX st.global.f32: store f32 to global memory",
   "ld.global.s32":      "PTX ld.global.s32: load signed i32 from global memory",
   "ld.global.u32":      "PTX ld.global.u32: load unsigned i32 from global memory",
+  "ld.global.b32":      "PTX ld.global.b32: load 32 bit value as raw bits from global memory",
   "st.global.s32":      "PTX st.global.s32: store signed i32 to global memory",
   "st.global.u32":      "PTX st.global.u32: store unsigned i32 to global memory",
+  "st.global.b32":      "PTX st.global.b32: store 32 bit value as raw bits to global memory",
   "ld.shared.b32":      "PTX ld.shared.b32: load 32 bit value from shared memory",
   "st.shared.b32":      "PTX st.shared.b32: store 32 bit value to shared memory",
   "bar.sync":           "PTX bar.sync: synchronize threads in a thread block",
@@ -114,6 +120,10 @@ export const LLVM_DESCRIPTIONS: Record<string, string> = {
   "ptrtoint_p1_to_i64":"LLVM IR ptrtoint addrspace(1) pointer to i64 integer",
   "inttoptr_i64_to_p1":"LLVM IR inttoptr i64 to addrspace(1) pointer",
 
+  // Kernel parameter access (scalar args)
+  "load_i32_param":         "LLVM IR i32 scalar kernel argument: 32 bit integer passed by value in kernel parameter space",
+  "load_i64_param":         "LLVM IR i64 scalar kernel argument: 64 bit integer or pointer passed by value in kernel parameter space",
+
   // Memory and GEP
   "load_float_addrspace1":  "LLVM IR load float addrspace(1): load f32 global",
   "store_float_addrspace1": "LLVM IR store float addrspace(1): store f32 global",
@@ -131,3 +141,51 @@ export const LLVM_DESCRIPTIONS: Record<string, string> = {
   "phi_i32":      "LLVM IR phi i32: loop-carried integer value",
   "ret_void":     "LLVM IR ret void: return from function",
 };
+
+// ---------------------------------------------------------------------------
+// Shared operand tokens — same description on both PTX and LLVM sides so the
+// embedding model maps them to the same point and lift algorithms pass them
+// through unchanged.
+// ---------------------------------------------------------------------------
+
+function ordinal(n: number): string {
+  const s = ["th","st","nd","rd"];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] ?? s[v] ?? s[0]!);
+}
+
+export const REGISTER_DESCRIPTIONS: Record<string, string> = {};
+
+// f0–f31: 32-bit float virtual registers
+for (let i = 0; i < 32; i++)
+  REGISTER_DESCRIPTIONS[`f${i}`] = `virtual f32 register number ${i}, the ${ordinal(i+1)} float register in PTX/LLVM scope`;
+
+// r0–r31: 32-bit integer virtual registers
+for (let i = 0; i < 32; i++)
+  REGISTER_DESCRIPTIONS[`r${i}`] = `virtual i32 register number ${i}, the ${ordinal(i+1)} 32-bit integer register in PTX/LLVM scope`;
+
+// rd0–rd31: 64-bit integer / pointer virtual registers
+for (let i = 0; i < 32; i++)
+  REGISTER_DESCRIPTIONS[`rd${i}`] = `virtual i64 register number ${i}, the ${ordinal(i+1)} 64-bit integer or pointer register in PTX/LLVM scope`;
+
+// p0–p15: predicate (i1) virtual registers
+for (let i = 0; i < 16; i++)
+  REGISTER_DESCRIPTIONS[`p${i}`] = `virtual predicate register number ${i}, the ${ordinal(i+1)} i1 boolean condition register in PTX/LLVM scope`;
+
+// mem_rd0–mem_rd31: memory addresses held in 64-bit registers
+for (let i = 0; i < 32; i++)
+  REGISTER_DESCRIPTIONS[`mem_rd${i}`] = `memory address held in 64-bit register rd${i}, used as a global memory pointer operand`;
+
+// imm: structural marker for an immediate constant in an instruction
+REGISTER_DESCRIPTIONS["imm"] = "an immediate constant value embedded directly in a PTX or LLVM IR instruction operand";
+
+// op_label: branch target label
+REGISTER_DESCRIPTIONS["op_label"] = "a branch target label operand in a PTX or LLVM IR instruction";
+
+// op_reg: generic or special-purpose register not covered by f/r/rd/p families
+REGISTER_DESCRIPTIONS["op_reg"] = "a generic or special-purpose register operand not classified as float, int, pointer, or predicate";
+
+// Merge shared tokens into both vocabs so the refresh script embeds them on
+// both sides with identical descriptions → identical embedding vectors.
+Object.assign(PTX_DESCRIPTIONS,  REGISTER_DESCRIPTIONS);
+Object.assign(LLVM_DESCRIPTIONS, REGISTER_DESCRIPTIONS);

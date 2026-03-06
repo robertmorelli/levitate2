@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "deny": [
+      "Bash(npm run patch*)",
+      "Bash(npm run refresh*)"
+    ]
+  }
+}

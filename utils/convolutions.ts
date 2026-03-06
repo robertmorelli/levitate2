@@ -7,10 +7,17 @@
  */
 import { register_conv } from "./registry.js";
 
+// ── 0. shared guard ───────────────────────────────────────────────────────────
+function require_vec(ptx_vectors: Record<string, number[]>, token: string): number[] {
+  const v = ptx_vectors[token];
+  if (!v) throw new Error(`Token not in vocab: '${token}' — run npm run refresh`);
+  return v;
+}
+
 // ── 1. identity ───────────────────────────────────────────────────────────────
 // No convolution — raw token vector. Baseline for comparison.
 register_conv("identity", (tokens, ptx_vectors) =>
-  tokens.map(t => [...(ptx_vectors[t] ?? [])])
+  tokens.map(t => [...require_vec(ptx_vectors, t)])
 );
 
 // ── 2. gaussian ───────────────────────────────────────────────────────────────
@@ -24,7 +31,7 @@ register_conv("gaussian", (tokens, ptx_vectors, dim) => {
     for (let j = Math.max(0, i - 2); j <= Math.min(tokens.length - 1, i + 2); j++) {
       const d = i - j;
       const w = Math.exp(-(d * d) / (2 * sigma * sigma));
-      const v = ptx_vectors[tokens[j] ?? ""] ?? [];
+      const v = require_vec(ptx_vectors, tokens[j] ?? "");
       for (let k = 0; k < dim; k++) out[k] = (out[k] ?? 0) + w * (v[k] ?? 0);
       total_w += w;
     }
@@ -42,7 +49,7 @@ register_conv("causal", (tokens, ptx_vectors, dim) => {
     const out = new Array<number>(dim).fill(0);
     let w = 1.0, total_w = 0;
     for (let j = i; j >= Math.max(0, i - 4); j--) {
-      const v = ptx_vectors[tokens[j] ?? ""] ?? [];
+      const v = require_vec(ptx_vectors, tokens[j] ?? "");
       for (let k = 0; k < dim; k++) out[k] = (out[k] ?? 0) + w * (v[k] ?? 0);
       total_w += w;
       w *= decay;
@@ -59,7 +66,7 @@ register_conv("uniform", (tokens, ptx_vectors, dim) =>
     const out = new Array<number>(dim).fill(0);
     let count = 0;
     for (let j = Math.max(0, i - 1); j <= Math.min(tokens.length - 1, i + 1); j++) {
-      const v = ptx_vectors[tokens[j] ?? ""] ?? [];
+      const v = require_vec(ptx_vectors, tokens[j] ?? "");
       for (let k = 0; k < dim; k++) out[k] = (out[k] ?? 0) + (v[k] ?? 0);
       count++;
     }
@@ -73,10 +80,10 @@ register_conv("uniform", (tokens, ptx_vectors, dim) =>
 // same operation. Like a 1D Laplacian / high-pass filter.
 register_conv("differential", (tokens, ptx_vectors, dim) =>
   tokens.map((t, i) => {
-    const self = ptx_vectors[t] ?? [];
+    const self = require_vec(ptx_vectors, t);
     const neighbors: number[][] = [];
-    if (i > 0)                    neighbors.push(ptx_vectors[tokens[i - 1] ?? ""] ?? []);
-    if (i < tokens.length - 1)   neighbors.push(ptx_vectors[tokens[i + 1] ?? ""] ?? []);
+    if (i > 0)                    neighbors.push(require_vec(ptx_vectors, tokens[i - 1] ?? ""));
+    if (i < tokens.length - 1)   neighbors.push(require_vec(ptx_vectors, tokens[i + 1] ?? ""));
     if (neighbors.length === 0)   return [...self];
     const mean = new Array<number>(dim).fill(0);
     for (const v of neighbors)
@@ -95,7 +102,7 @@ register_conv("ema", (tokens, ptx_vectors, dim) => {
   const result: number[][] = [];
   let state = new Array<number>(dim).fill(0);
   for (const t of tokens) {
-    const v = ptx_vectors[t] ?? [];
+    const v = require_vec(ptx_vectors, t);
     state = state.map((s, k) => alpha * s + (1 - alpha) * (v[k] ?? 0));
     result.push([...state]);
   }

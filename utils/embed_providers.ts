@@ -14,22 +14,52 @@ export type EmbedFn = (texts: string[]) => Promise<number[][]>;
 // ── Gemini ────────────────────────────────────────────────────────────────────
 
 export function make_gemini(api_key: string, model = "gemini-embedding-001"): EmbedFn {
-  return async (texts) => {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:batchEmbedContents?key=${api_key}`;
+  const BATCH = 50; // stay well under the 100/min per-item quota
+
+  async function embed_batch(url: string, texts: string[]): Promise<number[][]> {
     const body = {
       requests: texts.map(text => ({
         model: `models/${model}`,
         content: { parts: [{ text }] },
       })),
     };
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) throw new Error(`Gemini error ${res.status}: ${await res.text()}`);
-    const data = await res.json() as { embeddings: { values: number[] }[] };
-    return data.embeddings.map(e => e.values);
+
+    for (let attempt = 0; attempt < 12; attempt++) {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (res.ok) {
+        const data = await res.json() as { embeddings: { values: number[] }[] };
+        return data.embeddings.map(e => e.values);
+      }
+
+      if (res.status === 429) {
+        throw new Error(`Gemini rate limited (429) — quota exhausted, skipping provider`);
+      }
+
+      throw new Error(`Gemini error ${res.status}: ${await res.text()}`);
+    }
+
+    throw new Error("Gemini: exceeded retry limit");
+  }
+
+  return async (texts) => {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:batchEmbedContents?key=${api_key}`;
+    const out: number[][] = [];
+    for (let i = 0; i < texts.length; i += BATCH) {
+      if (i > 0) {
+        // Wait for the per-minute quota window to fully reset before next chunk
+        process.stdout.write(`\n  [gemini] inter-batch pause 70s... `);
+        await new Promise(r => setTimeout(r, 70000));
+      }
+      const chunk = texts.slice(i, i + BATCH);
+      const vecs = await embed_batch(url, chunk);
+      out.push(...vecs);
+    }
+    return out;
   };
 }
 
